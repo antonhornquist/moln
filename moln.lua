@@ -89,14 +89,6 @@ local function refresh_ui()
   update_arc_connected()
   update_event_indicator()
     
---[[
-TODO
-  if grid_dirty then
-    refresh_grid()
-    grid_dirty = false
-  end
-]]
-
   if arc_dirty then
     refresh_arc()
     arc_dirty = false

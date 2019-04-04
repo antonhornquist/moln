@@ -7,7 +7,7 @@ Polyphonic subtractive synthesizer
 
 ## Features
 
-- 2 pulse oscillators with variable pulse width and pulse width modulation.
+- 2 square oscillators per voice with variable pulse width and pulse width modulation.
 - Resonant lowpass filter
 - ADSR envelope
 
