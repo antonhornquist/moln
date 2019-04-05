@@ -3,7 +3,7 @@
 
 engine.name = 'R'
 
-local R = require 'we/lib/r'
+local R = require 'r/lib/r'
 local MusicUtil = require 'musicutil'
 local ControlSpec = require 'controlspec'
 local Formatters = require 'formatters'
