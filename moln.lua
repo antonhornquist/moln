@@ -1,5 +1,5 @@
 -- scriptname: moln
--- v1.1.0 @jah
+-- v1.1.1 @jah
 
 engine.name = 'R'
 
