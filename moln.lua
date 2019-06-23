@@ -1,5 +1,5 @@
 -- scriptname: moln
--- v1.1.1 @jah
+-- v1.1.2 @jah
 
 engine.name = 'R'
 
@@ -13,6 +13,8 @@ local engine_ready = false
 local trigging = false
 local fine = false
 local lastkeynote
+
+local refresh_ui_metro
 
 local my_arc
 local arc_connected = false
@@ -143,6 +145,12 @@ local function create_modules()
   engine.new("SoundOut", "SoundOut")
 end
 
+local function set_static_module_params()
+  R.engine.poly_set("OscA.FM", 1, POLYPHONY)
+  R.engine.poly_set("OscB.FM", 1, POLYPHONY)
+  R.engine.poly_set("Filter.AudioLevel", 1, POLYPHONY)
+end
+
 local function connect_modules()
   R.engine.poly_connect("FreqGate/Frequency", "OscA/FM", POLYPHONY)
   R.engine.poly_connect("FreqGate/Frequency", "OscB/FM", POLYPHONY)
@@ -178,6 +186,72 @@ local function create_macros()
   engine.newmacro("env_decay", R.util.poly_expand("Env.Decay", POLYPHONY))
   engine.newmacro("env_sustain", R.util.poly_expand("Env.Sustain", POLYPHONY))
   engine.newmacro("env_release", R.util.poly_expand("Env.Release", POLYPHONY))
+end
+
+local function init_midi()
+  local midi_device = midi.connect()
+  midi_device.event = function (data)
+    if engine_ready then
+      if #data == 0 then return end
+      local msg = midi.to_msg(data)
+      if msg.type == "note_off" then
+        note_off(msg.note)
+      elseif msg.type == "note_on" then
+        note_on(msg.note, msg.vel / 127)
+      end
+      flash_event()
+      redraw()
+    end
+  end
+end
+
+local function init_grid()
+  my_grid = grid.connect()
+  my_grid.key = function(x, y, state)
+    if engine_ready then
+      local note
+      if grid_width == 16 then
+        note = x * 8 + y
+      else
+        note = (4+x) * 8 + y
+      end
+      if state == 1 then
+        note_on(note, 5)
+        my_grid:led(x, y, 15)
+      else
+        note_off(note)
+        my_grid:led(x, y, 0)
+      end
+      my_grid:refresh()
+      flash_event()
+
+      grid_dirty = true
+      redraw()
+    end
+  end
+end
+
+local function init_arc()
+  my_arc = arc.connect()
+  my_arc.delta = function(n, delta)
+    local d
+    if fine then
+      d = delta/5
+    else
+      d = delta
+    end
+    if n == 1 then
+      local val = params:get_raw("filter_frequency")
+      params:set_raw("filter_frequency", val+d/500)
+    elseif n == 2 then
+      local val = params:get_raw("filter_resonance")
+      params:set_raw("filter_resonance", val+d/500)
+    end
+    flash_event()
+
+    arc_dirty = true
+    screen_dirty = true
+  end
 end
 
 local function init_params()
@@ -378,83 +452,11 @@ local function init_params()
   params:bang()
 end
 
-local function init_midi()
-  local midi_device = midi.connect()
-  midi_device.event = function (data)
-    if engine_ready then
-      if #data == 0 then return end
-      local msg = midi.to_msg(data)
-      if msg.type == "note_off" then
-        note_off(msg.note)
-      elseif msg.type == "note_on" then
-        note_on(msg.note, msg.vel / 127)
-      end
-      flash_event()
-      redraw()
-    end
-  end
-end
-
-local function init_grid()
-  my_grid = grid.connect()
-  my_grid.key = function(x, y, state)
-    if engine_ready then
-      local note
-      if grid_width == 16 then
-        note = x * 8 + y
-      else
-        note = (4+x) * 8 + y
-      end
-      if state == 1 then
-        note_on(note, 5)
-        my_grid:led(x, y, 15)
-      else
-        note_off(note)
-        my_grid:led(x, y, 0)
-      end
-      my_grid:refresh()
-      flash_event()
-   
-      grid_dirty = true
-      redraw()
-    end
-  end
-end
-
-local function init_arc()
-  my_arc = arc.connect()
-  my_arc.delta = function(n, delta)
-    local d
-    if fine then
-      d = delta/5
-    else
-      d = delta
-    end
-    if n == 1 then
-      local val = params:get_raw("filter_frequency")
-      params:set_raw("filter_frequency", val+d/500)
-    elseif n == 2 then
-      local val = params:get_raw("filter_resonance")
-      params:set_raw("filter_resonance", val+d/500)
-    end
-    flash_event()
-    
-    arc_dirty = true
-    screen_dirty = true
-  end
-end
-
 local function init_refresh_ui_metro()
   refresh_ui_metro = metro.init()
   refresh_ui_metro.event = refresh_ui
   refresh_ui_metro.time = 1/60
   refresh_ui_metro:start()
-end
-
-local function set_static_module_params()
-  R.engine.poly_set("OscA.FM", 1, POLYPHONY)
-  R.engine.poly_set("OscB.FM", 1, POLYPHONY)
-  R.engine.poly_set("Filter.AudioLevel", 1, POLYPHONY)
 end
 
 local function init_engine_init_delay_metro()
