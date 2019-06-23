@@ -14,26 +14,54 @@ local trigging = false
 local fine = false
 local lastkeynote
 
-local refresh_ui_metro
-
-local my_arc
-local arc_connected = false
-local arc_dirty = false
-
-local my_grid
-local grid_connected = false
-local grid_dirty = false
-local grid_width = 16
-  
 local POLYPHONY = 3
 local note_downs = {}
 local note_slots = {}
 
-local EVENT_FLASH_LENGTH = 10
-local event_flash_counter = nil
-local show_event_indicator = false
+---- UI (start) ----
 
-local function flash_event()
+local UI = {}
+
+-- refresh logic
+
+function UI.init(rate)
+  UI.refresh_metro = metro.init()
+  UI.refresh_metro.event = UI.tick
+  UI.refresh_metro.time = 1/(rate or 60)
+  UI.refresh_metro:start()
+end
+
+function UI.tick() -- TODO: make a local in separate UI lib?
+  UI.update_arc_connected()
+  UI.update_grid_width()
+  UI.update_grid_connected()
+  UI.update_event_indicator()
+    
+  if UI.arc_dirty then
+    UI.refresh_arc(UI.my_arc)
+    UI.my_arc:refresh()
+    UI.arc_dirty = false
+  end
+
+  if UI.grid_dirty then
+    UI.refresh_grid(UI.my_grid)
+    UI.my_grid:refresh()
+    UI.grid_dirty = false
+  end
+
+  if screen_dirty then
+    redraw() -- TODO: weirdly hard wired to redraw()
+    screen_dirty = false
+  end
+end
+
+-- event flash
+
+local EVENT_FLASH_LENGTH = 10
+local UI.show_event_indicator = false
+local event_flash_counter = nil
+
+function UI.flash_event()
   event_flash_counter = EVENT_FLASH_LENGTH
 end
   
@@ -42,64 +70,174 @@ local function update_event_indicator()
     event_flash_counter = event_flash_counter - 1
     if event_flash_counter == 0 then
       event_flash_counter = nil
-      show_event_indicator = false
-      screen_dirty = true
+      UI.show_event_indicator = false
+      UI.set_screen_dirty()
     else
-      if not show_event_indicator then
-        show_event_indicator = true
-        screen_dirty = true
+      if not UI.show_event_indicator then
+        UI.show_event_indicator = true
+        UI.set_screen_dirty()
       end
     end
   end
 end
 
-local function update_grid_width()
+-- arc
+
+local UI.arc_connected = false
+local UI.arc_dirty = false
+
+local function UI.set_arc_dirty()
+  UI.arc_dirty = true
+end
+
+function UI.setup_arc(delta_callback, refresh_callback)
+  local my_arc = arc.connect() -- TODO: rename to arc or devices.arc?
+  my_arc.delta = delta_callback
+  UI.my_arc = my_arc
+  UI.refresh_arc = refresh_callback
+end
+
+local function UI.update_arc_connected()
+  local arc_check = UI.my_arc.device ~= nil
+  if UI.arc_connected ~= arc_check then
+    UI.arc_connected = arc_check
+    UI.set_arc_dirty()
+  end
+end
+  
+-- grid
+
+local UI.grid_connected = false
+local UI.grid_dirty = false
+local UI.grid_width = 16
+
+local function UI.set_grid_dirty()
+  UI.grid_dirty = true
+end
+
+function UI.setup_grid(key_callback, refresh_callback)
+  local my_grid = grid.connect()
+  my_grid.key = key_callback
+  UI.my_grid = my_grid
+  UI.refresh_grid = refresh_callback
+end
+
+function UI.update_grid_width()
   if my_grid.device then
-    if grid_width ~= my_grid.cols then
-      grid_width = my_grid.cols
-      grid_dirty = true
+    if UI.grid_width ~= my_grid.cols then
+      UI.grid_width = my_grid.cols
+      UI.set_grid_dirty()
     end
   end
 end
 
-local function update_grid_connected()
+function UI.update_grid_connected()
   local grid_check = my_grid.device ~= nil
-  if grid_connected ~= grid_check then
-    grid_connected = grid_check
-    grid_dirty = true
+  if UI.grid_connected ~= grid_check then
+    UI.grid_connected = grid_check
+    UI.set_grid_dirty()
   end
 end
 
-local function update_arc_connected()
-  local arc_check = my_arc.device ~= nil
-  if arc_connected ~= arc_check then
-    arc_connected = arc_check
-    arc_dirty = true
+-- midi
+
+function UI.setup_midi(event_callback)
+  local my_midi_device = midi.connect()
+  my_midi_device.event = event_callback
+  UI.my_midi_device = my_midi_device
+end
+
+-- refresh
+
+local hi_level = 15
+local lo_level = 4
+
+local enc1_x = 0
+local enc1_y = 12
+
+local enc2_x = 10
+local enc2_y = 32
+
+local enc3_x = enc2_x+65
+local enc3_y = enc2_y
+
+local key2_x = 0
+local key2_y = 63
+
+local key3_x = key2_x+65
+local key3_y = key2_y
+
+local function redraw_enc1_widget()
+  screen.move(enc1_x, enc1_y)
+  screen.level(lo_level)
+  screen.text("LEVEL")
+  screen.move(enc1_x+45, enc1_y)
+  screen.level(hi_level)
+  screen.text(util.round(mix:get_raw("output")*100, 1))
+end
+
+local function redraw_event_flash_widget()
+  screen.level(lo_level)
+  screen.rect(122, enc1_y-7, 5, 5)
+  screen.fill()
+end
+
+local function redraw_enc2_widget()
+  screen.move(enc2_x, enc2_y)
+  screen.level(lo_level)
+  screen.text("FREQ")
+  screen.move(enc2_x, enc2_y+12)
+  screen.level(hi_level)
+  
+  local freq_str
+  local freq = params:get("filter_frequency")
+  if util.round(freq, 1) >= 10000 then
+    freq_str = util.round(freq/1000, 1) .. "kHz"
+  elseif util.round(freq, 1) >= 1000 then
+    freq_str = util.round(freq/1000, 0.1) .. "kHz"
+  else
+    freq_str = util.round(freq, 1) .. "Hz"
   end
+  screen.text(freq_str)
+end
+
+local function redraw_enc3_widget()
+  screen.move(enc3_x, enc3_y)
+  screen.level(lo_level)
+  screen.text("RES")
+  screen.move(enc3_x, enc3_y+12)
+  screen.level(hi_level)
+  
+  screen.text(util.round(params:get("filter_resonance")*100, 1))
+  screen.text("%")
 end
   
-local function refresh_arc()
-  my_arc:all(0)
-  my_arc:led(1, util.round(params:get_raw("filter_frequency")*64), 15)
-  my_arc:led(2, util.round(params:get_raw("filter_resonance")*64), 15)
-  my_arc:refresh()
-end
-
-local function refresh_ui()
-  update_grid_width()
-  update_grid_connected()
-  update_arc_connected()
-  update_event_indicator()
-    
-  if arc_dirty then
-    refresh_arc()
-    arc_dirty = false
-  end
-
-  if screen_dirty then
-    redraw()
+local function redraw_key2_widget()
+  screen.move(key2_x, key2_y)
+  
+  if fine then
+    screen.level(hi_level)
+    screen.text("FINE")
+  else
+    screen.level(lo_level)
+    screen.text("COARSE")
   end
 end
+
+local function redraw_key3_widget()
+  screen.move(key3_x, key3_y)
+  
+  if engine_ready then
+    if trigging then
+      screen.level(hi_level)
+    else
+      screen.level(lo_level)
+    end
+    screen.text("TRIG")
+  end
+end
+
+---- UI (fin) ----
 
 local function trig_voice(voicenum, note)
   engine.bulkset("FreqGate"..voicenum..".Gate 1 FreqGate"..voicenum..".Frequency "..MusicUtil.note_num_to_freq(note))
@@ -120,7 +258,7 @@ local function note_on(note, velocity)
     end
     note_slots[note] = slot
     note_downs[voicenum] = true
-    redraw()
+    UI.set_screen_dirty()
   end
 end
 
@@ -129,7 +267,7 @@ local function note_off(note)
   if slot then
     voice:release(slot)
     note_downs[slot.id] = false
-    redraw()
+    UI.set_screen_dirty()
   end
 end
 
@@ -186,72 +324,6 @@ local function create_macros()
   engine.newmacro("env_decay", R.util.poly_expand("Env.Decay", POLYPHONY))
   engine.newmacro("env_sustain", R.util.poly_expand("Env.Sustain", POLYPHONY))
   engine.newmacro("env_release", R.util.poly_expand("Env.Release", POLYPHONY))
-end
-
-local function init_midi()
-  local midi_device = midi.connect()
-  midi_device.event = function (data)
-    if engine_ready then
-      if #data == 0 then return end
-      local msg = midi.to_msg(data)
-      if msg.type == "note_off" then
-        note_off(msg.note)
-      elseif msg.type == "note_on" then
-        note_on(msg.note, msg.vel / 127)
-      end
-      flash_event()
-      redraw()
-    end
-  end
-end
-
-local function init_grid()
-  my_grid = grid.connect()
-  my_grid.key = function(x, y, state)
-    if engine_ready then
-      local note
-      if grid_width == 16 then
-        note = x * 8 + y
-      else
-        note = (4+x) * 8 + y
-      end
-      if state == 1 then
-        note_on(note, 5)
-        my_grid:led(x, y, 15)
-      else
-        note_off(note)
-        my_grid:led(x, y, 0)
-      end
-      my_grid:refresh()
-      flash_event()
-
-      grid_dirty = true
-      redraw()
-    end
-  end
-end
-
-local function init_arc()
-  my_arc = arc.connect()
-  my_arc.delta = function(n, delta)
-    local d
-    if fine then
-      d = delta/5
-    else
-      d = delta
-    end
-    if n == 1 then
-      local val = params:get_raw("filter_frequency")
-      params:set_raw("filter_frequency", val+d/500)
-    elseif n == 2 then
-      local val = params:get_raw("filter_resonance")
-      params:set_raw("filter_resonance", val+d/500)
-    end
-    flash_event()
-
-    arc_dirty = true
-    screen_dirty = true
-  end
 end
 
 local function init_params()
@@ -361,8 +433,8 @@ local function init_params()
     controlspec=filter_frequency_spec,
     action=function (value)
       engine.macroset("filter_frequency", value)
-      arc_dirty = true
-      screen_dirty = true
+      UI.set_arc_dirty()
+      UI.set_screen_dirty()
     end
   }
 
@@ -377,8 +449,8 @@ local function init_params()
     formatter=Formatters.percentage,
     action=function (value)
       engine.macroset("filter_resonance", value)
-      arc_dirty = true
-      screen_dirty = true
+      UI.set_arc_dirty()
+      UI.set_screen_dirty()
     end
   }
 
@@ -452,20 +524,15 @@ local function init_params()
   params:bang()
 end
 
-local function init_refresh_ui_metro()
-  refresh_ui_metro = metro.init()
-  refresh_ui_metro.event = refresh_ui
-  refresh_ui_metro.time = 1/60
-  refresh_ui_metro:start()
-end
-
 local function init_engine_init_delay_metro()
   engine_init_delay_metro = metro.init()
   engine_init_delay_metro.event = function()
     engine_ready = true
-    arc_dirty = true
-    grid_dirty = true
-    screen_dirty = true
+
+    UI.set_arc_dirty() -- TODO: UI.set_all_dirty()
+    UI.set_grid_dirty()
+    UI.set_screen_dirty()
+
     engine_init_delay_metro:stop()
   end
   engine_init_delay_metro.time = 1
@@ -480,106 +547,83 @@ function init()
   connect_modules()
   create_macros()
 
-  init_midi()
-  init_grid()
-  init_arc()
-
   init_params()
   
-  init_refresh_ui_metro()
+  UI.setup_midi(
+    function (data)
+      if engine_ready then
+        if #data == 0 then return end
+        local msg = midi.to_msg(data)
+        if msg.type == "note_off" then
+          note_off(msg.note)
+        elseif msg.type == "note_on" then
+          note_on(msg.note, msg.vel / 127)
+        end
+        UI.flash_event()
+        UI.set_screen_dirty()
+      end
+    end
+  )
+
+  UI.setup_grid(
+    function(x, y, state)
+      if engine_ready then
+        local note
+        if UI.grid_width == 16 then
+          note = x * 8 + y
+        else
+          note = (4+x) * 8 + y
+        end
+        if state == 1 then
+          note_on(note, 5)
+          UI.my_grid:led(x, y, 15) -- TODO: refactor to refresh
+        else
+          note_off(note)
+          UI.my_grid:led(x, y, 0) -- TODO: refactor to refresh
+        end
+        UI.my_grid:refresh() -- TODO: refactor to refresh
+        UI.flash_event()
+
+        UI.set_grid_dirty()
+        UI.set_screen_dirty()
+      end
+    end
+  )
+
+  UI.setup_arc(
+    function(n, delta)
+      local d
+      if fine then
+        d = delta/5
+      else
+        d = delta
+      end
+      if n == 1 then
+        local val = params:get_raw("filter_frequency")
+        params:set_raw("filter_frequency", val+d/500)
+      elseif n == 2 then
+        local val = params:get_raw("filter_resonance")
+        params:set_raw("filter_resonance", val+d/500)
+      end
+      UI.flash_event()
+
+      UI.set_arc_dirty()
+      UI.set_screen_dirty()
+    end,
+    function(my_arc)
+      my_arc:all(0)
+      my_arc:led(1, util.round(params:get_raw("filter_frequency")*64), 15)
+      my_arc:led(2, util.round(params:get_raw("filter_resonance")*64), 15)
+    end
+  )
+
+  UI.init()
+
   init_engine_init_delay_metro()
 end
 
 function cleanup()
   params:write()
-end
-
-local hi_level = 15
-local lo_level = 4
-
-local enc1_x = 0
-local enc1_y = 12
-
-local enc2_x = 10
-local enc2_y = 32
-
-local enc3_x = enc2_x+65
-local enc3_y = enc2_y
-
-local key2_x = 0
-local key2_y = 63
-
-local key3_x = key2_x+65
-local key3_y = key2_y
-
-local function redraw_enc1_widget()
-  screen.move(enc1_x, enc1_y)
-  screen.level(lo_level)
-  screen.text("LEVEL")
-  screen.move(enc1_x+45, enc1_y)
-  screen.level(hi_level)
-  screen.text(util.round(mix:get_raw("output")*100, 1))
-end
-
-local function redraw_event_flash_widget()
-  screen.level(lo_level)
-  screen.rect(122, enc1_y-7, 5, 5)
-  screen.fill()
-end
-
-local function redraw_enc2_widget()
-  screen.move(enc2_x, enc2_y)
-  screen.level(lo_level)
-  screen.text("FREQ")
-  screen.move(enc2_x, enc2_y+12)
-  screen.level(hi_level)
-  
-  local freq_str
-  local freq = params:get("filter_frequency")
-  if util.round(freq, 1) >= 10000 then
-    freq_str = util.round(freq/1000, 1) .. "kHz"
-  elseif util.round(freq, 1) >= 1000 then
-    freq_str = util.round(freq/1000, 0.1) .. "kHz"
-  else
-    freq_str = util.round(freq, 1) .. "Hz"
-  end
-  screen.text(freq_str)
-end
-
-local function redraw_enc3_widget()
-  screen.move(enc3_x, enc3_y)
-  screen.level(lo_level)
-  screen.text("RES")
-  screen.move(enc3_x, enc3_y+12)
-  screen.level(hi_level)
-  
-  screen.text(util.round(params:get("filter_resonance")*100, 1))
-  screen.text("%")
-end
-  
-local function redraw_key2_widget()
-  screen.move(key2_x, key2_y)
-  
-  if fine then
-    screen.level(hi_level)
-    screen.text("FINE")
-  else
-    screen.level(lo_level)
-    screen.text("COARSE")
-  end
-end
-
-local function redraw_key3_widget()
-  screen.move(key3_x, key3_y)
-  
-  if engine_ready then
-    if trigging then
-      screen.level(hi_level)
-    else
-      screen.level(lo_level)
-    end
-    screen.text("TRIG")
-  end
 end
 
 function redraw()
@@ -588,7 +632,7 @@ function redraw()
 
   redraw_enc1_widget()
 
-  if show_event_indicator then
+  if UI.show_event_indicator then
     redraw_event_flash_widget()
   end
 
@@ -609,7 +653,7 @@ function enc(n, delta)
   end
   if n == 1 then
     mix:delta("output", d)
-    screen_dirty = true
+    UI.set_screen_dirty()
   elseif n == 2 then
     params:delta("filter_frequency", d)
   elseif n == 3 then
@@ -624,19 +668,19 @@ function key(n, z)
     else
       fine = false
     end
-    screen_dirty = true
+    UI.set_screen_dirty()
   elseif n == 3 then
     if engine_ready then
       if z == 1 then
         lastkeynote = math.random(60) + 20
         note_on(lastkeynote, 100)
         trigging = true
-        screen_dirty = true
+        UI.set_screen_dirty()
       else
         if lastkeynote then
           note_off(lastkeynote)
           trigging = false
-          screen_dirty = true
+          UI.set_screen_dirty()
         end
       end
     end
