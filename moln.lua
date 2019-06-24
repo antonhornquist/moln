@@ -38,34 +38,38 @@ function UI.tick() -- TODO: make a local in separate UI lib?
   UI.update_event_indicator()
     
   if UI.arc_dirty then
-    UI.refresh_arc(UI.my_arc)
+    if UI.refresh_arc_callback then
+      UI.refresh_arc_callback(UI.my_arc)
+    end
     UI.my_arc:refresh()
     UI.arc_dirty = false
   end
 
   if UI.grid_dirty then
-    UI.refresh_grid(UI.my_grid)
+    if UI.refresh_grid_callback then
+      UI.refresh_grid_callback(UI.my_grid)
+    end
     UI.my_grid:refresh()
     UI.grid_dirty = false
   end
 
-  if screen_dirty then
+  if UI.screen_dirty then
     redraw() -- TODO: weirdly hard wired to redraw()
-    screen_dirty = false
+    UI.screen_dirty = false
   end
 end
 
 -- event flash
 
 local EVENT_FLASH_LENGTH = 10
-local UI.show_event_indicator = false
+UI.show_event_indicator = false
 local event_flash_counter = nil
 
 function UI.flash_event()
   event_flash_counter = EVENT_FLASH_LENGTH
 end
   
-local function update_event_indicator()
+function UI.update_event_indicator()
   if event_flash_counter then
     event_flash_counter = event_flash_counter - 1
     if event_flash_counter == 0 then
@@ -83,10 +87,10 @@ end
 
 -- arc
 
-local UI.arc_connected = false
-local UI.arc_dirty = false
+UI.arc_connected = false
+UI.arc_dirty = false
 
-local function UI.set_arc_dirty()
+function UI.set_arc_dirty()
   UI.arc_dirty = true
 end
 
@@ -94,10 +98,10 @@ function UI.setup_arc(delta_callback, refresh_callback)
   local my_arc = arc.connect() -- TODO: rename to arc or devices.arc?
   my_arc.delta = delta_callback
   UI.my_arc = my_arc
-  UI.refresh_arc = refresh_callback
+  UI.refresh_arc_callback = refresh_callback
 end
 
-local function UI.update_arc_connected()
+function UI.update_arc_connected()
   local arc_check = UI.my_arc.device ~= nil
   if UI.arc_connected ~= arc_check then
     UI.arc_connected = arc_check
@@ -107,11 +111,11 @@ end
   
 -- grid
 
-local UI.grid_connected = false
-local UI.grid_dirty = false
-local UI.grid_width = 16
+UI.grid_connected = false
+UI.grid_dirty = false
+UI.grid_width = 16
 
-local function UI.set_grid_dirty()
+function UI.set_grid_dirty()
   UI.grid_dirty = true
 end
 
@@ -119,20 +123,20 @@ function UI.setup_grid(key_callback, refresh_callback)
   local my_grid = grid.connect()
   my_grid.key = key_callback
   UI.my_grid = my_grid
-  UI.refresh_grid = refresh_callback
+  UI.refresh_grid_callback = refresh_callback
 end
 
 function UI.update_grid_width()
-  if my_grid.device then
-    if UI.grid_width ~= my_grid.cols then
-      UI.grid_width = my_grid.cols
+  if UI.my_grid.device then
+    if UI.grid_width ~= UI.my_grid.cols then
+      UI.grid_width = UI.my_grid.cols
       UI.set_grid_dirty()
     end
   end
 end
 
 function UI.update_grid_connected()
-  local grid_check = my_grid.device ~= nil
+  local grid_check = UI.my_grid.device ~= nil
   if UI.grid_connected ~= grid_check then
     UI.grid_connected = grid_check
     UI.set_grid_dirty()
@@ -147,7 +151,13 @@ function UI.setup_midi(event_callback)
   UI.my_midi_device = my_midi_device
 end
 
--- refresh
+-- screen refresh
+
+function UI.set_screen_dirty()
+  UI.screen_dirty = true
+end
+
+-- screen refresh
 
 local hi_level = 15
 local lo_level = 4
