@@ -370,17 +370,25 @@ function init()
       end
     end,
     function(my_grid)
-      for note in pairs(note_downs) do
-        print(note)
-        --[[
-        local x
-        local y
-        if UI.grid_width == 16 then
-          note = x * 8 + y
-        else
-          note = (4+x) * 8 + y
+      my_grid:all(0)
+      for voicenum=1,POLYPHONY do
+        local note = note_downs[voicenum]
+        if note then
+          local x
+          local y
+          --[[
+          if UI.grid_width == 16 then
+            note = x * 8 + y
+          else
+          ]]
+            -- note = (4+x) * 8 + y
+            x = 5
+            y = 3
+          --[[
+          end
+          ]]
+          my_grid:led(x, y, 15)
         end
-        ]]
       end
     end
   )
@@ -565,11 +573,13 @@ function key(n, z)
         note_on(lastkeynote, 100)
         trigging = true
         UI.set_screen_dirty()
+        UI.set_grid_dirty()
       else
         if lastkeynote then
           note_off(lastkeynote)
           trigging = false
           UI.set_screen_dirty()
+          UI.set_grid_dirty()
         end
       end
     end
