@@ -357,16 +357,30 @@ function init()
         end
         if state == 1 then
           note_on(note, 5)
-          UI.my_grid:led(x, y, 15) -- TODO: refactor to grid refresh callback
+          -- UI.my_grid:led(x, y, 15) -- TODO: refactor to grid refresh callback
         else
           note_off(note)
-          UI.my_grid:led(x, y, 0) -- TODO: refactor to grid refresh callback
+          -- UI.my_grid:led(x, y, 0) -- TODO: refactor to grid refresh callback
         end
-        UI.my_grid:refresh() -- TODO: remove once UI refresh logic invoking grid refresh callback is used
+        -- UI.my_grid:refresh() -- TODO: remove once UI refresh logic invoking grid refresh callback is used
         UI.flash_event()
 
         UI.set_grid_dirty()
         UI.set_screen_dirty()
+      end
+    end,
+    function(my_grid)
+      for note in pairs(note_downs) do
+        print(note)
+        --[[
+        local x
+        local y
+        if UI.grid_width == 16 then
+          note = x * 8 + y
+        else
+          note = (4+x) * 8 + y
+        end
+        ]]
       end
     end
   )
