@@ -1,3 +1,4 @@
+-- utility library for single-grid, single-arc, single-midi device script UIs
 -- prerequisites: metro, midi, arc, grid globals defined
 
 ---- UI (start) ----

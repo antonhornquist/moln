@@ -1,5 +1,5 @@
 -- scriptname: moln
--- v1.1.2 @jah
+-- v1.1.3 @jah
 
 engine.name = 'R'
 
@@ -9,6 +9,8 @@ local ControlSpec = require 'controlspec'
 local Formatters = require 'formatters'
 local Voice = require 'voice'
 
+local UI = require 'moln/lib/ui'
+
 local engine_ready = false
 local trigging = false
 local fine = false
@@ -17,8 +19,6 @@ local lastkeynote
 local POLYPHONY = 3
 local note_downs = {}
 local note_slots = {}
-
-local UI = require 'moln/lib/ui'
 
 local function trig_voice(voicenum, note)
   engine.bulkset("FreqGate"..voicenum..".Gate 1 FreqGate"..voicenum..".Frequency "..MusicUtil.note_num_to_freq(note))
@@ -38,7 +38,7 @@ local function note_on(note, velocity)
       note_slots[note] = nil
     end
     note_slots[note] = slot
-    note_downs[voicenum] = true
+    note_downs[voicenum] = note
     UI.set_screen_dirty()
   end
 end
@@ -47,7 +47,7 @@ local function note_off(note)
   local slot = note_slots[note]
   if slot then
     voice:release(slot)
-    note_downs[slot.id] = false
+    note_downs[slot.id] = nil
     UI.set_screen_dirty()
   end
 end
@@ -357,12 +357,12 @@ function init()
         end
         if state == 1 then
           note_on(note, 5)
-          UI.my_grid:led(x, y, 15) -- TODO: refactor to refresh
+          UI.my_grid:led(x, y, 15) -- TODO: refactor to grid refresh callback
         else
           note_off(note)
-          UI.my_grid:led(x, y, 0) -- TODO: refactor to refresh
+          UI.my_grid:led(x, y, 0) -- TODO: refactor to grid refresh callback
         end
-        UI.my_grid:refresh() -- TODO: refactor to refresh
+        UI.my_grid:refresh() -- TODO: remove once UI refresh logic invoking grid refresh callback is used
         UI.flash_event()
 
         UI.set_grid_dirty()
