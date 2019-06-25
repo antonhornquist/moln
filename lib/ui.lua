@@ -1,20 +1,11 @@
 -- utility library for single-grid, single-arc, single-midi device script UIs
 -- prerequisites: metro, midi, arc, grid globals defined
 
----- UI (start) ----
-
 local UI = {}
 
 -- refresh logic
 
-function UI.init(rate)
-  UI.refresh_metro = metro.init()
-  UI.refresh_metro.event = UI.tick
-  UI.refresh_metro.time = 1/(rate or 60)
-  UI.refresh_metro:start()
-end
-
-function UI.tick() -- TODO: make a local in separate UI lib?
+local function tick()
   UI.update_arc_connected()
   UI.update_grid_width()
   UI.update_grid_connected()
@@ -40,8 +31,25 @@ function UI.tick() -- TODO: make a local in separate UI lib?
     if UI.refresh_screen_callback then
       UI.refresh_screen_callback()
     end
+    screen.update()
     UI.screen_dirty = false
   end
+end
+
+function UI.init(rate)
+  UI.refresh_metro = metro.init()
+  UI.refresh_metro.event = tick
+  UI.refresh_metro.time = 1/(rate or 60)
+  UI.refresh_metro:start()
+end
+
+function UI.setup(config)
+  UI.setup_midi(config.midi_event_callback)
+  UI.setup_grid(config.grid_key_callback, config.grid_refresh_callback)
+  UI.setup_arc(config.arc_delta_callback, config.arc_refresh_callback)
+  UI.setup_screen(config.screen_refresh_callback)
+
+  UI.init()
 end
 
 -- event flash
@@ -116,7 +124,9 @@ function UI.update_grid_width()
     if UI.grid_width ~= UI.my_grid.cols then
       UI.grid_width = UI.my_grid.cols
       UI.set_grid_dirty()
-      -- TODO: add grid_width_changed callback
+      if UI.grid_width_changed_callback then
+        UI.grid_width_changed_callback(UI.grid_width)
+      end
     end
   end
 end
@@ -146,7 +156,5 @@ end
 function UI.setup_screen(refresh_callback)
   UI.refresh_screen_callback = refresh_callback
 end
-
----- UI (fin) ----
 
 return UI
