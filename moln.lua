@@ -273,6 +273,10 @@ local function init_params()
   params:bang()
 end
 
+local function release_voice(voicenum)
+  engine.bulkset("FreqGate"..voicenum..".Gate 0")
+end
+
 local function note_on(note, velocity)
   local function trig_voice(voicenum, note)
     engine.bulkset("FreqGate"..voicenum..".Gate 1 FreqGate"..voicenum..".Frequency "..MusicUtil.note_num_to_freq(note))
@@ -293,10 +297,6 @@ local function note_on(note, velocity)
 end
 
 local function note_off(note)
-  local function release_voice(voicenum)
-    engine.bulkset("FreqGate"..voicenum..".Gate 0")
-  end
-
   local slot = note_slots[note]
   if slot then
     voice:release(slot)
@@ -307,17 +307,17 @@ end
 
 local function gridkey_to_note(x, y, grid_width)
   if grid_width == 16 then
-    return x * 16 + y
+    return x * 8 + y
   else
-    return (4+x) * 16 + y
+    return (4+x) * 8 + y
   end
 end
 
 local function note_to_gridkey(note, grid_width)
   if grid_width == 16 then
-    return math.floor(note/16), note % 16
+    return math.floor(note/8), note % 8
   else
-    return math.floor(note/16) - 4, note % 16
+    return math.floor(note/8) - 4, note % 8
   end
 end
 
@@ -346,188 +346,6 @@ function init()
 
   init_params()
   
-  --[[
-  UI.setup_midi(
-    function (data)
-      if engine_ready then
-        if #data == 0 then return end
-        local msg = midi.to_msg(data)
-        if msg.type == "note_off" then
-          note_off(msg.note)
-        elseif msg.type == "note_on" then
-          note_on(msg.note, msg.vel / 127)
-        end
-        UI.flash_event()
-        UI.set_screen_dirty()
-      end
-    end
-  )
-
-  UI.setup_grid(
-    function(x, y, state)
-      if engine_ready then
-        local note = gridkey_to_note(x, y, UI.grid_width)
-        if state == 1 then
-          note_on(note, 5)
-        else
-          note_off(note)
-        end
-        UI.flash_event()
-
-        UI.set_grid_dirty()
-        UI.set_screen_dirty()
-      end
-    end,
-    function(my_grid)
-      my_grid:all(0)
-      for voicenum=1,POLYPHONY do
-        local note = note_downs[voicenum]
-        if note then
-          local x, y = note_to_gridkey(note, UI.grid_width)
-          my_grid:led(x, y, 15)
-        end
-      end
-    end
-  )
-
-  UI.setup_arc(
-    function(n, delta)
-      local d
-      if fine then
-        d = delta/5
-      else
-        d = delta
-      end
-      if n == 1 then
-        local val = params:get_raw("filter_frequency")
-        params:set_raw("filter_frequency", val+d/500)
-      elseif n == 2 then
-        local val = params:get_raw("filter_resonance")
-        params:set_raw("filter_resonance", val+d/500)
-      end
-      UI.flash_event()
-
-      UI.set_arc_dirty()
-      UI.set_screen_dirty()
-    end,
-    function(my_arc)
-      my_arc:all(0)
-      my_arc:led(1, util.round(params:get_raw("filter_frequency")*64), 15)
-      my_arc:led(2, util.round(params:get_raw("filter_resonance")*64), 15)
-    end
-  )
-
-  UI.setup_screen(
-    function()
-      local hi_level = 15
-      local lo_level = 4
-
-      local enc1_x = 0
-      local enc1_y = 12
-
-      local enc2_x = 10
-      local enc2_y = 32
-
-      local enc3_x = enc2_x+65
-      local enc3_y = enc2_y
-
-      local key2_x = 0
-      local key2_y = 63
-
-      local key3_x = key2_x+65
-      local key3_y = key2_y
-
-      local function redraw_enc1_widget()
-        screen.move(enc1_x, enc1_y)
-        screen.level(lo_level)
-        screen.text("LEVEL")
-        screen.move(enc1_x+45, enc1_y)
-        screen.level(hi_level)
-        screen.text(util.round(mix:get_raw("output")*100, 1))
-      end
-
-      local function redraw_event_flash_widget()
-        screen.level(lo_level)
-        screen.rect(122, enc1_y-7, 5, 5)
-        screen.fill()
-      end
-
-      local function redraw_enc2_widget()
-        screen.move(enc2_x, enc2_y)
-        screen.level(lo_level)
-        screen.text("FREQ")
-        screen.move(enc2_x, enc2_y+12)
-        screen.level(hi_level)
-        
-        local freq_str
-        local freq = params:get("filter_frequency")
-        if util.round(freq, 1) >= 10000 then
-          freq_str = util.round(freq/1000, 1) .. "kHz"
-        elseif util.round(freq, 1) >= 1000 then
-          freq_str = util.round(freq/1000, 0.1) .. "kHz"
-        else
-          freq_str = util.round(freq, 1) .. "Hz"
-        end
-        screen.text(freq_str)
-      end
-
-      local function redraw_enc3_widget()
-        screen.move(enc3_x, enc3_y)
-        screen.level(lo_level)
-        screen.text("RES")
-        screen.move(enc3_x, enc3_y+12)
-        screen.level(hi_level)
-        
-        screen.text(util.round(params:get("filter_resonance")*100, 1))
-        screen.text("%")
-      end
-        
-      local function redraw_key2_widget()
-        screen.move(key2_x, key2_y)
-        
-        if fine then
-          screen.level(hi_level)
-          screen.text("FINE")
-        else
-          screen.level(lo_level)
-          screen.text("COARSE")
-        end
-      end
-
-      local function redraw_key3_widget()
-        screen.move(key3_x, key3_y)
-        
-        if engine_ready then
-          if trigging then
-            screen.level(hi_level)
-          else
-            screen.level(lo_level)
-          end
-          screen.text("TRIG")
-        end
-      end
-
-      screen.font_size(16)
-      screen.clear()
-
-      redraw_enc1_widget()
-
-      if UI.show_event_indicator then
-        redraw_event_flash_widget()
-      end
-
-      redraw_enc2_widget()
-      redraw_enc3_widget()
-      redraw_key2_widget()
-      redraw_key3_widget()
-
-      screen.update()
-    end
-  )
-
-  UI.init()
-  ]]
-
   UI.setup {
     midi_event_callback = function (data)
       if engine_ready then
@@ -589,7 +407,7 @@ function init()
       my_arc:all(0)
       my_arc:led(1, util.round(params:get_raw("filter_frequency")*64), 15)
       my_arc:led(2, util.round(params:get_raw("filter_resonance")*64), 15)
-    end
+    end,
     screen_refresh_callback = function()
       local hi_level = 15
       local lo_level = 4
