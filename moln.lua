@@ -6,7 +6,6 @@ engine.name = 'R'
 local R = require 'r/lib/r'
 local UI = require 'moln/lib/ui'
 
-local MusicUtil = require 'musicutil'
 local ControlSpec = require 'controlspec'
 local Formatters = require 'formatters'
 local Voice = require 'voice'
@@ -182,8 +181,8 @@ local function init_params()
     controlspec=filter_frequency_spec,
     action=function (value)
       engine.macroset("filter_frequency", value)
-      UI.set_arc_dirty()
-      UI.set_screen_dirty()
+      UI.arc_dirty = true
+      UI.screen_dirty = true
     end
   }
 
@@ -198,8 +197,8 @@ local function init_params()
     formatter=Formatters.percentage,
     action=function (value)
       engine.macroset("filter_resonance", value)
-      UI.set_arc_dirty()
-      UI.set_screen_dirty()
+      UI.arc_dirty = true
+      UI.screen_dirty = true
     end
   }
 
@@ -269,6 +268,7 @@ local function init_params()
       engine.macroset("env_release", value)
     end
   }
+
   params:read()
   params:bang()
 end
@@ -277,13 +277,18 @@ local function release_voice(voicenum)
   engine.bulkset("FreqGate"..voicenum..".Gate 0")
 end
 
+local function to_hz(note)
+  local exp = (note - 21) / 12
+  return 27.5 * 2^exp
+end
+
 local function note_on(note, velocity)
   local function trig_voice(voicenum, note)
-    engine.bulkset("FreqGate"..voicenum..".Gate 1 FreqGate"..voicenum..".Frequency "..MusicUtil.note_num_to_freq(note))
+    engine.bulkset("FreqGate"..voicenum..".Gate 1 FreqGate"..voicenum..".Frequency "..to_hz(note))
   end
 
   if not note_slots[note] then
-    local slot = voice:get()
+    local slot = voice_allocator:get()
     local voicenum = slot.id
     trig_voice(voicenum, note)
     slot.on_release = function()
@@ -292,16 +297,16 @@ local function note_on(note, velocity)
     end
     note_slots[note] = slot
     note_downs[voicenum] = note
-    UI.set_screen_dirty()
+    UI.screen_dirty = true
   end
 end
 
 local function note_off(note)
   local slot = note_slots[note]
   if slot then
-    voice:release(slot)
+    voice_allocator:release(slot)
     note_downs[slot.id] = nil
-    UI.set_screen_dirty()
+    UI.screen_dirty = true
   end
 end
 
@@ -322,13 +327,11 @@ local function note_to_gridkey(note, grid_width)
 end
 
 local function init_engine_init_delay_metro()
-  engine_init_delay_metro = metro.init()
+  local engine_init_delay_metro = metro.init()
   engine_init_delay_metro.event = function()
     engine_ready = true
 
-    UI.set_arc_dirty()
-    UI.set_grid_dirty()
-    UI.set_screen_dirty()
+    UI.set_dirty()
 
     engine_init_delay_metro:stop()
   end
@@ -336,55 +339,17 @@ local function init_engine_init_delay_metro()
   engine_init_delay_metro:start()
 end
 
-function init()
-  voice = Voice.new(POLYPHONY)
+local function init_60_fps_ui_refresh_metro()
+  local ui_refresh_metro = metro.init()
+  ui_refresh_metro.event = UI.refresh
+  ui_refresh_metro.time = 1/60
+  ui_refresh_metro:start()
+end
 
-  create_modules()
-  set_static_module_params()
-  connect_modules()
-  create_macros()
-
-  init_params()
-  
-  UI.setup {
-    midi_event_callback = function (data)
-      if engine_ready then
-        if #data == 0 then return end
-        local msg = midi.to_msg(data)
-        if msg.type == "note_off" then
-          note_off(msg.note)
-        elseif msg.type == "note_on" then
-          note_on(msg.note, msg.vel / 127)
-        end
-        UI.flash_event()
-        UI.set_screen_dirty()
-      end
-    end,
-    grid_key_callback = function(x, y, state)
-      if engine_ready then
-        local note = gridkey_to_note(x, y, UI.grid_width)
-        if state == 1 then
-          note_on(note, 5)
-        else
-          note_off(note)
-        end
-        UI.flash_event()
-
-        UI.set_grid_dirty()
-        UI.set_screen_dirty()
-      end
-    end,
-    grid_refresh_callback = function(my_grid)
-      my_grid:all(0)
-      for voicenum=1,POLYPHONY do
-        local note = note_downs[voicenum]
-        if note then
-          local x, y = note_to_gridkey(note, UI.grid_width)
-          my_grid:led(x, y, 15)
-        end
-      end
-    end,
-    arc_delta_callback = function(n, delta)
+local function init_ui()
+  UI.init_arc {
+    device = arc.connect(),
+    delta_callback = function(n, delta)
       local d
       if fine then
         d = delta/5
@@ -400,20 +365,81 @@ function init()
       end
       UI.flash_event()
 
-      UI.set_arc_dirty()
-      UI.set_screen_dirty()
+      UI.arc_dirty = true
+      UI.screen_dirty = true
     end,
-    arc_refresh_callback = function(my_arc)
+    refresh_callback = function(my_arc)
       my_arc:all(0)
       my_arc:led(1, util.round(params:get_raw("filter_frequency")*64), 15)
       my_arc:led(2, util.round(params:get_raw("filter_resonance")*64), 15)
+    end
+  }
+
+  UI.init_grid {
+    device = grid.connect(),
+    key_callback = function(x, y, state)
+      if engine_ready then
+        local note = gridkey_to_note(x, y, UI.grid_width)
+        if state == 1 then
+          note_on(note, 5)
+        else
+          note_off(note)
+        end
+        UI.flash_event()
+
+        UI.grid_dirty = true
+        UI.screen_dirty = true
+      end
     end,
-    screen_refresh_callback = function() -- TODO
+    refresh_callback = function(my_grid)
+      my_grid:all(0)
+      for voicenum=1,POLYPHONY do
+        local note = note_downs[voicenum]
+        if note then
+          local x, y = note_to_gridkey(note, UI.grid_width)
+          my_grid:led(x, y, 15)
+        end
+      end
+    end
+  }
+
+  UI.init_midi {
+    device = midi.connect(),
+    event_callback = function (data)
+      if engine_ready then
+        if #data == 0 then return end
+        local msg = midi.to_msg(data)
+        if msg.type == "note_off" then
+          note_off(msg.note)
+        elseif msg.type == "note_on" then
+          note_on(msg.note, msg.vel / 127)
+        end
+        UI.flash_event()
+        UI.screen_dirty = true
+      end
+    end
+  }
+
+  UI.init_screen {
+    refresh_callback = function() -- TODO
       redraw()
     end
   }
 
+  init_60_fps_ui_refresh_metro()
   init_engine_init_delay_metro()
+end
+
+function init()
+  voice_allocator = Voice.new(POLYPHONY)
+
+  create_modules()
+  set_static_module_params()
+  connect_modules()
+  create_macros()
+
+  init_params()
+  init_ui()
 end
 
 function cleanup()
@@ -535,7 +561,7 @@ function enc(n, delta)
   end
   if n == 1 then
     mix:delta("output", d)
-    UI.set_screen_dirty()
+    UI.screen_dirty = true
   elseif n == 2 then
     params:delta("filter_frequency", d)
   elseif n == 3 then
@@ -550,21 +576,21 @@ function key(n, z)
     else
       fine = false
     end
-    UI.set_screen_dirty()
+    UI.screen_dirty = true
   elseif n == 3 then
     if engine_ready then
       if z == 1 then
         lastkeynote = math.random(60) + 20
         note_on(lastkeynote, 100)
         trigging = true
-        UI.set_screen_dirty()
-        UI.set_grid_dirty()
+        UI.screen_dirty = true
+        UI.grid_dirty = true
       else
         if lastkeynote then
           note_off(lastkeynote)
           trigging = false
-          UI.set_screen_dirty()
-          UI.set_grid_dirty()
+          UI.screen_dirty = true
+          UI.grid_dirty = true
         end
       end
     end
