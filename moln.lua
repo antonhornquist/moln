@@ -363,7 +363,6 @@ local function init_ui()
         local val = params:get_raw("filter_resonance")
         params:set_raw("filter_resonance", val+d/500)
       end
-      UI.flash_event()
 
       UI.arc_dirty = true
       UI.screen_dirty = true
@@ -385,7 +384,6 @@ local function init_ui()
         else
           note_off(note)
         end
-        UI.flash_event()
 
         UI.grid_dirty = true
         UI.screen_dirty = true
@@ -414,7 +412,6 @@ local function init_ui()
         elseif msg.type == "note_on" then
           note_on(msg.note, msg.vel / 127)
         end
-        UI.flash_event()
         UI.screen_dirty = true
       end
     end
