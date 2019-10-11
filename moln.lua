@@ -268,9 +268,6 @@ local function init_params()
       engine.macroset("env_release", value)
     end
   }
-
-  params:read()
-  params:bang()
 end
 
 local function release_voice(voicenum)
@@ -418,7 +415,7 @@ local function init_ui()
   }
 
   UI.init_screen {
-    refresh_callback = function() -- TODO
+    refresh_callback = function()
       redraw()
     end
   }
@@ -437,6 +434,9 @@ function init()
 
   init_params()
   init_ui()
+
+  params:read()
+  params:bang()
 end
 
 function cleanup()
