@@ -111,6 +111,7 @@ local function init_params()
     formatter=Formatters.round(1),
     action=function (value)
       engine.macroset("osc_a_range", value)
+      UI.set_dirty()
     end
   }
 
@@ -125,6 +126,7 @@ local function init_params()
     formatter=Formatters.percentage,
     action=function (value)
       engine.macroset("osc_a_pulsewidth", value)
+      UI.set_dirty()
     end
   }
 
@@ -136,6 +138,7 @@ local function init_params()
     formatter=Formatters.round(1),
     action=function (value)
       engine.macroset("osc_b_range", value)
+      UI.set_dirty()
     end
   }
 
@@ -150,6 +153,7 @@ local function init_params()
     formatter=Formatters.percentage,
     action=function (value)
       engine.macroset("osc_b_pulsewidth", value)
+      UI.set_dirty()
     end
   }
 
@@ -165,6 +169,7 @@ local function init_params()
     action=function (value)
       engine.macroset("osc_a_detune", -value*10)
       engine.macroset("osc_b_detune", value*10)
+      UI.set_dirty()
     end
   }
 
@@ -179,6 +184,7 @@ local function init_params()
     formatter=Formatters.round(0.001),
     action=function (value)
       engine.macroset("lfo_frequency", value)
+      UI.set_dirty()
     end
   }
 
@@ -194,6 +200,7 @@ local function init_params()
     action=function (value)
       engine.macroset("osc_a_pwm", value*0.76)
       engine.macroset("osc_b_pwm", value*0.56)
+      UI.set_dirty()
     end
   }
 
@@ -209,8 +216,7 @@ local function init_params()
     controlspec=filter_frequency_spec,
     action=function (value)
       engine.macroset("filter_frequency", value)
-      UI.arc_dirty = true
-      UI.screen_dirty = true
+      UI.set_dirty()
     end
   }
 
@@ -225,8 +231,7 @@ local function init_params()
     formatter=Formatters.percentage,
     action=function (value)
       engine.macroset("filter_resonance", value)
-      UI.arc_dirty = true
-      UI.screen_dirty = true
+      UI.set_dirty()
     end
   }
 
@@ -241,6 +246,7 @@ local function init_params()
     formatter=Formatters.percentage,
     action=function (value)
       engine.macroset("env_to_filter_fm", value)
+      UI.set_dirty()
     end
   }
 
@@ -254,6 +260,7 @@ local function init_params()
     controlspec=env_attack_spec,
     action=function (value)
       engine.macroset("env_attack", value)
+      UI.set_dirty()
     end
   }
 
@@ -267,6 +274,7 @@ local function init_params()
     controlspec=env_decay_spec,
     action=function (value)
       engine.macroset("env_decay", value)
+      UI.set_dirty()
     end
   }
 
@@ -281,6 +289,7 @@ local function init_params()
     formatter=Formatters.percentage,
     action=function (value)
       engine.macroset("env_sustain", value)
+      UI.set_dirty()
     end
   }
 
@@ -294,6 +303,7 @@ local function init_params()
     controlspec=env_release_spec,
     action=function (value)
       engine.macroset("env_release", value)
+      UI.set_dirty()
     end
   }
 end
@@ -364,9 +374,24 @@ local function init_engine_init_delay_metro()
   engine_init_delay_metro:start()
 end
 
+local function refresh()
+  if target_page then
+    current_page = current_page + page_trans_div
+    page_trans_frames = page_trans_frames - 1
+    -- print("refresh: current_page="..current_page.." target_page="..target_page.." page_trans_frames="..page_trans_frames)
+    if page_trans_frames == 0 then
+      current_page = target_page
+      -- print("refresh current_page="..current_page.."!")
+      target_page = nil
+    end
+    UI.screen_dirty = true
+  end
+  UI.refresh()
+end
+
 local function init_60_fps_ui_refresh_metro()
   local ui_refresh_metro = metro.init()
-  ui_refresh_metro.event = UI.refresh
+  ui_refresh_metro.event = refresh
   ui_refresh_metro.time = 1/60
   ui_refresh_metro:start()
 end
@@ -381,21 +406,12 @@ local function init_ui()
       else
         d = delta
       end
-      if n == 1 then
-        local val = params:get_raw("filter_frequency")
-        params:set_raw("filter_frequency", val+d/500)
-      elseif n == 2 then
-        local val = params:get_raw("filter_resonance")
-        params:set_raw("filter_resonance", val+d/500)
-      end
-
-      UI.arc_dirty = true
-      UI.screen_dirty = true
+      change_current_page_param_raw_delta(n, d/500)
     end,
     refresh_callback = function(my_arc)
       my_arc:all(0)
-      my_arc:led(1, util.round(params:get_raw("filter_frequency")*64), 15)
-      my_arc:led(2, util.round(params:get_raw("filter_resonance")*64), 15)
+      my_arc:led(1, util.round(params:get_raw(get_current_page_param_id(1))*64), 15)
+      my_arc:led(2, util.round(params:get_raw(get_current_page_param_id(2))*64), 15)
     end
   }
 
@@ -493,29 +509,11 @@ function redraw()
   local function redraw_enc1_widget()
     screen.move(enc1_x, enc1_y)
 
-    local function draw_enc1_page_widget()
-      screen.level(lo_level)
-      screen.text("PAGE")
-      screen.move(enc1_x+45, enc1_y)
-      screen.level(hi_level)
-      screen.text(current_page)
-      screen.text("/")
-      screen.text(num_pages)
-    end
-
-    local function draw_enc1_level_widget()
-      screen.level(lo_level)
-      screen.text("LEVEL")
-      screen.move(enc1_x+45, enc1_y)
-      screen.level(hi_level)
-      screen.text(util.round(mix:get_raw("output")*100, 1))
-    end
-
-    if alt_held then
-      draw_enc1_page_widget()
-    else
-      draw_enc1_level_widget()
-    end
+    screen.level(lo_level)
+    screen.text("LEVEL")
+    screen.move(enc1_x+45, enc1_y)
+    screen.level(hi_level)
+    screen.text(util.round(mix:get_raw("output")*100, 1))
   end
 
   local function redraw_event_flash_widget()
@@ -534,87 +532,126 @@ function redraw()
     end
   end
 
-  local function redraw_enc2_widget()
-    screen.move(enc2_x, enc2_y)
+  local enc2_params = {
+    {
+      label="FREQ",
+      value=function()
+        return format_filter_frequency(params:get("filter_frequency"))
+      end
+    },
+    {
+      label="A.RNG",
+      value=function()
+        return params:string("osc_a_range")
+      end
+    },
+    {
+      label="A.PW",
+      value=function()
+        return params:string("osc_a_pulsewidth")
+      end
+    }
+  }
 
-    local function draw_enc2_label_param(label, param)
-      screen.level(lo_level)
-      screen.text(label)
-      screen.move(enc2_x, enc2_y+12)
-      screen.level(hi_level)
-      screen.text(param)
-    end
-
-    if current_page == 1 then
-      draw_enc2_label_param("FREQ", format_filter_frequency(params:get("filter_frequency")))
-    elseif current_page == 2 then
-      draw_enc2_label_param("A.RNG", format_filter_frequency(params:get("osc_a_range")))
-    elseif current_page == 3 then
-      draw_enc3_label_param("A.PW", format_filter_frequency(params:get("osc_a_pulsewidth")))
-    end
+  local function draw_label_param_at(label, param, x, y)
+    screen.move(x, y)
+    screen.level(lo_level)
+    screen.text(label)
+    screen.move(x, y+12)
+    screen.level(hi_level)
+    screen.text(param)
   end
 
   local function format_filter_resonance(res)
     return util.round(params:get("filter_resonance")*100, 1) .. "%"
   end
 
-  local function redraw_enc3_widget()
-    screen.move(enc3_x, enc3_y)
+  local function draw_enc2_label_param_at(index, x, y)
+    local ui_param = enc2_params[index]
+    screen.move(x, y)
+    screen.level(lo_level)
+    screen.text(ui_param.label)
+    screen.move(x, y+12)
+    screen.level(hi_level)
+    screen.text(ui_param.value())
+  end
 
-    local function draw_enc3_label_param(label, param)
-      screen.level(lo_level)
-      screen.text(label)
-      screen.move(enc3_x, enc3_y+12)
-      screen.level(hi_level)
-      screen.text(param)
+  local function redraw_enc2_widget()
+    local left = math.floor(current_page)
+    local right = math.ceil(current_page)
+    local offset = current_page - left
+    local pixel_ofs = util.round(offset*128)
+
+    draw_enc2_label_param_at(left, enc2_x-pixel_ofs, enc2_y)
+
+    if left ~= right then
+      draw_enc2_label_param_at(right, enc2_x+128-pixel_ofs, enc2_y)
     end
+  end
 
-    if current_page == 1 then
-      draw_enc3_label_param("RES", format_filter_resonance(params:get("filter_resonance")))
-    elseif current_page == 2 then
-      draw_enc3_label_param("B.RNG", format_filter_frequency(params:get("osc_b_range")))
-    elseif current_page == 3 then
-      draw_enc3_label_param("B.PW", format_filter_frequency(params:get("osc_b_pulsewidth")))
+  local enc3_params = {
+    {
+      label="RES",
+      value=function()
+        return format_filter_resonance(params:get("filter_resonance"))
+      end
+    },
+    {
+      label="B.RNG",
+      value=function()
+        return params:string("osc_b_range")
+      end
+    },
+    {
+      label="B.PW",
+      value=function()
+        return params:string("osc_b_pulsewidth")
+      end
+    }
+  }
+
+  local function draw_enc3_label_param_at(index, x, y)
+    local ui_param = enc3_params[index]
+    screen.move(x, y)
+    screen.level(lo_level)
+    screen.text(ui_param.label)
+    screen.move(x, y+12)
+    screen.level(hi_level)
+    screen.text(ui_param.value())
+  end
+
+  local function redraw_enc3_widget()
+    local left = math.floor(current_page)
+    local right = math.ceil(current_page)
+    local offset = current_page - left
+    local pixel_ofs = util.round(offset*128)
+
+    draw_enc3_label_param_at(left, enc3_x-pixel_ofs, enc3_y)
+
+    if left ~= right then
+      draw_enc3_label_param_at(right, enc3_x+128-pixel_ofs, enc3_y)
     end
   end
     
-  local function redraw_key3_widget()
-    screen.move(key3_x, key3_y)
-
-    if alt_held then
-      screen.level(hi_level)
-    else
-      screen.level(lo_level)
-    end
-    screen.text("ALT")
-  end
-
   local function redraw_key2_widget()
     screen.move(key2_x, key2_y)
-    
-    if alt_held then
-      --[[
-      if engine_ready then
-        if trigging then
-          screen.level(hi_level)
-        else
-          screen.level(lo_level)
-        end
-        screen.text("TRIG")
-      end
-      ]]
-      screen.text("NEXT PAGE")
+    if prev_held then
+      screen.level(hi_level)
     else
-      if fine then
-        screen.level(hi_level)
-        screen.text("FINE")
-      else
-        screen.level(lo_level)
-        screen.text("COARSE")
-      end
+      screen.level(lo_level)
     end
+    screen.text("PREV")
   end
 
+  local function redraw_key3_widget()
+    screen.move(key3_x, key3_y)
+    if next_held then
+      screen.level(hi_level)
+    else
+      screen.level(lo_level)
+    end
+    screen.text("NEXT")
+  end
 
   screen.font_size(16)
   screen.clear()
@@ -633,6 +670,46 @@ function redraw()
   screen.update()
 end
 
+function get_current_page_param_id(n)
+  local page = util.round(current_page)
+  if page == 1 then
+    if n == 1 then
+      return "filter_frequency"
+    elseif n == 2 then
+      return "filter_resonance"
+    end
+  elseif page == 2 then
+    if n == 1 then
+      return "osc_a_range"
+    elseif n == 2 then
+      return "osc_b_range"
+    end
+  elseif page == 3 then
+    if n == 1 then
+      return "osc_a_pulsewidth"
+    elseif n == 2 then
+      return "osc_b_pulsewidth"
+    end
+  end
+end
+
+function transition_to_page(page)
+  source_page = current_page
+  target_page = page
+  page_trans_frames = 12--6
+  page_trans_div = (target_page - source_page) / page_trans_frames
+end
+
+function change_current_page_param_delta(n, delta)
+  params:delta(get_current_page_param_id(n), delta)
+end
+
+function change_current_page_param_raw_delta(n, rawdelta)
+  local id = get_current_page_param_id(n)
+  local val = params:get_raw(id)
+  params:set_raw(id, val+rawdelta)
+end
+
 function enc(n, delta)
   local d
   if fine then
@@ -643,45 +720,37 @@ function enc(n, delta)
   if n == 1 then
     mix:delta("output", d)
     UI.screen_dirty = true
-  elseif n == 2 then
-    params:delta("filter_frequency", d)
-  elseif n == 3 then
-    params:delta("filter_resonance", d)
+  else
+    change_current_page_param_delta(n-1, d)
   end
 end
 
 function key(n, z)
   if n == 2 then
     if z == 1 then
-      alt_held = true
+      local page = current_page
+      page = page - 1
+      if page < 1 then
+        page = num_pages
+      end
+      transition_to_page(page)
+      prev_held = true
     else
-      alt_held = false
+      prev_held = false
     end
+    UI.set_dirty()
   elseif n == 3 then
-    if alt_held then
-      if engine_ready then
-        if z == 1 then
-          lastkeynote = math.random(60) + 20
-          note_on(lastkeynote, 100)
-          trigging = true
-          UI.screen_dirty = true
-          UI.grid_dirty = true
-        else
-          if lastkeynote then
-            note_off(lastkeynote)
-            trigging = false
-            UI.screen_dirty = true
-            UI.grid_dirty = true
-          end
-        end
+    if z == 1 then
+      local page = current_page
+      page = page + 1
+      if page > num_pages then
+        page = 1
       end
+      transition_to_page(page)
+      next_held = true
     else
-      if z == 1 then
-        fine = true
-      else
-        fine = false
-      end
-      UI.screen_dirty = true
+      next_held = false
     end
+    UI.set_dirty()
   end
 end
