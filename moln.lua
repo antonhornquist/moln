@@ -1,4 +1,10 @@
+-- scriptname: moln
+-- v1.1.4 @jah
+
 --[[
+--
+--pages
+--
 Filter Frequency
 Filter Resonance
 
@@ -20,9 +26,6 @@ Env Decay
 Env Sustain
 Env Release
 ]]
-
--- scriptname: moln
--- v1.1.4 @jah
 
 engine.name = 'R'
 
