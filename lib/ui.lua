@@ -2,7 +2,21 @@
 -- written to track dirty states of UI, provide a generic refresh function
 -- written to not be directly dependent on norns global variables
 
-local UI = {}
+local UI = {
+  -- event indicator flag
+  show_event_indicator = false,
+  -- arc handling
+  arc_connected = false,
+  arc_dirty = false,
+  -- grid handling
+  grid_connected = false,
+  grid_dirty = false,
+  grid_width = nil,
+  -- midi handling
+  midi_device_connected = false,
+  -- screen handling
+  screen_dirty = false
+}
 
 -- refresh logic
 
@@ -14,9 +28,9 @@ function UI.refresh()
       
     if UI.arc_dirty then
       if UI.arc_refresh_callback then
-        UI.arc_refresh_callback(UI.my_arc)
+        UI.arc_refresh_callback(UI.arc_device)
       end
-      UI.my_arc:refresh()
+      UI.arc_device:refresh()
       UI.arc_dirty = false
     end
   end
@@ -27,9 +41,9 @@ function UI.refresh()
 
     if UI.grid_dirty then
       if UI.grid_refresh_callback then
-        UI.grid_refresh_callback(UI.my_grid)
+        UI.grid_refresh_callback(UI.grid_device)
       end
-      UI.my_grid:refresh()
+      UI.grid_device:refresh()
       UI.grid_dirty = false
     end
   end
@@ -56,7 +70,6 @@ end
 -- event flash
 
 local EVENT_FLASH_FRAMES = 10
-UI.show_event_indicator = false
 local event_flash_frame_counter = nil
 
 function UI.flash_event()
@@ -81,23 +94,23 @@ end
 
 -- arc
 
-UI.arc_connected = false
-UI.arc_dirty = false
-
 function UI.init_arc(config)
-  local my_arc = config.device
+  local arc_device = config.device
+
+  -- TODO: throw error if arc_device is nil
+
   UI.arc_delta_callback = config.delta_callback
-  my_arc.delta = function(n, delta)
+  arc_device.delta = function(n, delta)
     UI.flash_event()
     UI.arc_delta_callback(n, delta)
   end
-  UI.my_arc = my_arc
+  UI.arc_device = arc_device
   UI.arc_refresh_callback = config.refresh_callback
   UI.arc_inited = true
 end
 
 function UI.check_arc_connected()
-  local arc_check = UI.my_arc.device ~= nil
+  local arc_check = UI.arc_device.device ~= nil
   if UI.arc_connected ~= arc_check then
     UI.arc_connected = arc_check
     UI.arc_dirty = true
@@ -106,27 +119,26 @@ end
   
 -- grid
 
-UI.grid_connected = false
-UI.grid_dirty = false
-UI.grid_width = nil
-
 function UI.init_grid(config)
-  local my_grid = config.device
+  local grid_device = config.device
+
+  -- TODO: throw error if grid_device is nil
+
   UI.grid_key_callback = config.key_callback
-  my_grid.key = function(x, y, s)
+  grid_device.key = function(x, y, s)
     UI.flash_event()
     UI.grid_key_callback(x, y, s)
   end
-  UI.my_grid = my_grid
+  UI.grid_device = grid_device
   UI.grid_refresh_callback = config.refresh_callback
-  UI.grid_width_changed_callback = config.width_changed_callback
+  UI.grid_width_changed_callback = config.width_changed_callback -- TODO: consider just updating grid_width in UI table, defer check for this to scripts
   UI.grid_inited = true
 end
 
 function UI.update_grid_width()
-  if UI.my_grid.device then
-    if UI.grid_width ~= UI.my_grid.cols then
-      UI.grid_width = UI.my_grid.cols
+  if UI.grid_device.device then
+    if UI.grid_width ~= UI.grid_device.cols then
+      UI.grid_width = UI.grid_device.cols
       if UI.grid_width_changed_callback then
         UI.grid_width_changed_callback(UI.grid_width)
       end
@@ -135,7 +147,7 @@ function UI.update_grid_width()
 end
 
 function UI.check_grid_connected()
-  local grid_check = UI.my_grid.device ~= nil
+  local grid_check = UI.grid_device.device ~= nil
   if UI.grid_connected ~= grid_check then
     UI.grid_connected = grid_check
     UI.grid_dirty = true
@@ -145,18 +157,21 @@ end
 -- midi
 
 function UI.init_midi(config)
-  local my_midi_device = config.device
+  local midi_device = config.device
+
+  -- TODO: throw error if midi_device is nil
+
   UI.midi_event_callback = config.event_callback
-  my_midi_device.event = function(data)
+  midi_device.event = function(data)
     UI.flash_event()
     UI.midi_event_callback(data)
   end
-  UI.my_midi_device = my_midi_device
+  UI.midi_device = midi_device
   UI.midi_inited = true
 end
 
 function UI.check_midi_connected()
-  local midi_device_check = UI.my_midi_device.device ~= nil
+  local midi_device_check = UI.midi_device.device ~= nil
   if UI.midi_device_connected ~= midi_device_check then
     UI.midi_device_connected = midi_device_check
   end

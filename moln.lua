@@ -1,23 +1,48 @@
+--[[
+Filter Frequency
+Filter Resonance
+
+Osc A Range
+Osc B Range
+
+Osc A PW
+Osc B PW
+
+Osc Detune
+LFO Frequency
+
+LFO>PWM
+Env > Filter Frequency
+
+Env Attack
+Env Decay
+
+Env Sustain
+Env Release
+]]
+
 -- scriptname: moln
 -- v1.1.4 @jah
 
 engine.name = 'R'
 
-local R = require 'r/lib/r'
-local UI = require 'moln/lib/ui'
+local ControlSpec = require('controlspec')
+local Formatters = require('formatters')
+local Voice = require('voice')
+local R = require('r/lib/r') -- assumes r engine resides in ~/dust/code/r folder
+local UI = include('lib/ui')
 
-local ControlSpec = require 'controlspec'
-local Formatters = require 'formatters'
-local Voice = require 'voice'
+local POLYPHONY = 5
+local note_downs = {}
+local note_slots = {}
 
 local engine_ready = false
 local trigging = false
 local fine = false
 local lastkeynote
-
-local POLYPHONY = 3
-local note_downs = {}
-local note_slots = {}
+local alt_held = false
+local current_page = 1
+local num_pages = 3
 
 local function create_modules()
   R.engine.poly_new("FreqGate", "FreqGate", POLYPHONY)
@@ -464,11 +489,30 @@ function redraw()
 
   local function redraw_enc1_widget()
     screen.move(enc1_x, enc1_y)
-    screen.level(lo_level)
-    screen.text("LEVEL")
-    screen.move(enc1_x+45, enc1_y)
-    screen.level(hi_level)
-    screen.text(util.round(mix:get_raw("output")*100, 1))
+
+    local function draw_enc1_page_widget()
+      screen.level(lo_level)
+      screen.text("PAGE")
+      screen.move(enc1_x+45, enc1_y)
+      screen.level(hi_level)
+      screen.text(current_page)
+      screen.text("/")
+      screen.text(num_pages)
+    end
+
+    local function draw_enc1_level_widget()
+      screen.level(lo_level)
+      screen.text("LEVEL")
+      screen.move(enc1_x+45, enc1_y)
+      screen.level(hi_level)
+      screen.text(util.round(mix:get_raw("output")*100, 1))
+    end
+
+    if alt_held then
+      draw_enc1_page_widget()
+    else
+      draw_enc1_level_widget()
+    end
   end
 
   local function redraw_event_flash_widget()
@@ -477,60 +521,97 @@ function redraw()
     screen.fill()
   end
 
+  local function format_filter_frequency(freq)
+    if util.round(freq, 1) >= 10000 then
+      return util.round(freq/1000, 1) .. "kHz"
+    elseif util.round(freq, 1) >= 1000 then
+      return util.round(freq/1000, 0.1) .. "kHz"
+    else
+      return util.round(freq, 1) .. "Hz"
+    end
+  end
+
   local function redraw_enc2_widget()
     screen.move(enc2_x, enc2_y)
-    screen.level(lo_level)
-    screen.text("FREQ")
-    screen.move(enc2_x, enc2_y+12)
-    screen.level(hi_level)
-    
-    local freq_str
-    local freq = params:get("filter_frequency")
-    if util.round(freq, 1) >= 10000 then
-      freq_str = util.round(freq/1000, 1) .. "kHz"
-    elseif util.round(freq, 1) >= 1000 then
-      freq_str = util.round(freq/1000, 0.1) .. "kHz"
-    else
-      freq_str = util.round(freq, 1) .. "Hz"
+
+    local function draw_enc2_label_param(label, param)
+      screen.level(lo_level)
+      screen.text(label)
+      screen.move(enc2_x, enc2_y+12)
+      screen.level(hi_level)
+      screen.text(param)
     end
-    screen.text(freq_str)
+
+    if current_page == 1 then
+      draw_enc2_label_param("FREQ", format_filter_frequency(params:get("filter_frequency")))
+    elseif current_page == 2 then
+      draw_enc2_label_param("A.RNG", format_filter_frequency(params:get("osc_a_range")))
+    elseif current_page == 3 then
+      draw_enc3_label_param("A.PW", format_filter_frequency(params:get("osc_a_pulsewidth")))
+    end
+  end
+
+  local function format_filter_resonance(res)
+    return util.round(params:get("filter_resonance")*100, 1) .. "%"
   end
 
   local function redraw_enc3_widget()
     screen.move(enc3_x, enc3_y)
-    screen.level(lo_level)
-    screen.text("RES")
-    screen.move(enc3_x, enc3_y+12)
-    screen.level(hi_level)
-    
-    screen.text(util.round(params:get("filter_resonance")*100, 1))
-    screen.text("%")
+
+    local function draw_enc3_label_param(label, param)
+      screen.level(lo_level)
+      screen.text(label)
+      screen.move(enc3_x, enc3_y+12)
+      screen.level(hi_level)
+      screen.text(param)
+    end
+
+    if current_page == 1 then
+      draw_enc3_label_param("RES", format_filter_resonance(params:get("filter_resonance")))
+    elseif current_page == 2 then
+      draw_enc3_label_param("B.RNG", format_filter_frequency(params:get("osc_b_range")))
+    elseif current_page == 3 then
+      draw_enc3_label_param("B.PW", format_filter_frequency(params:get("osc_b_pulsewidth")))
+    end
   end
     
+  local function redraw_key3_widget()
+    screen.move(key3_x, key3_y)
+
+    if alt_held then
+      screen.level(hi_level)
+    else
+      screen.level(lo_level)
+    end
+    screen.text("ALT")
+  end
+
   local function redraw_key2_widget()
     screen.move(key2_x, key2_y)
     
-    if fine then
-      screen.level(hi_level)
-      screen.text("FINE")
+    if alt_held then
+      --[[
+      if engine_ready then
+        if trigging then
+          screen.level(hi_level)
+        else
+          screen.level(lo_level)
+        end
+        screen.text("TRIG")
+      end
+      ]]
+      screen.text("NEXT PAGE")
     else
-      screen.level(lo_level)
-      screen.text("COARSE")
+      if fine then
+        screen.level(hi_level)
+        screen.text("FINE")
+      else
+        screen.level(lo_level)
+        screen.text("COARSE")
+      end
     end
   end
 
-  local function redraw_key3_widget()
-    screen.move(key3_x, key3_y)
-    
-    if engine_ready then
-      if trigging then
-        screen.level(hi_level)
-      else
-        screen.level(lo_level)
-      end
-      screen.text("TRIG")
-    end
-  end
 
   screen.font_size(16)
   screen.clear()
@@ -569,27 +650,35 @@ end
 function key(n, z)
   if n == 2 then
     if z == 1 then
-      fine = true
+      alt_held = true
     else
-      fine = false
+      alt_held = false
     end
-    UI.screen_dirty = true
   elseif n == 3 then
-    if engine_ready then
-      if z == 1 then
-        lastkeynote = math.random(60) + 20
-        note_on(lastkeynote, 100)
-        trigging = true
-        UI.screen_dirty = true
-        UI.grid_dirty = true
-      else
-        if lastkeynote then
-          note_off(lastkeynote)
-          trigging = false
+    if alt_held then
+      if engine_ready then
+        if z == 1 then
+          lastkeynote = math.random(60) + 20
+          note_on(lastkeynote, 100)
+          trigging = true
           UI.screen_dirty = true
           UI.grid_dirty = true
+        else
+          if lastkeynote then
+            note_off(lastkeynote)
+            trigging = false
+            UI.screen_dirty = true
+            UI.grid_dirty = true
+          end
         end
       end
+    else
+      if z == 1 then
+        fine = true
+      else
+        fine = false
+      end
+      UI.screen_dirty = true
     end
   end
 end
