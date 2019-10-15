@@ -45,7 +45,6 @@ local fine = false
 local lastkeynote
 local alt_held = false
 local current_page = 1
-local num_pages = 3
 
 local function create_modules()
   R.engine.poly_new("FreqGate", "FreqGate", POLYPHONY)
@@ -167,8 +166,8 @@ local function init_params()
     controlspec=osc_detune_spec,
     formatter=Formatters.percentage,
     action=function (value)
-      engine.macroset("osc_a_detune", -value*10)
-      engine.macroset("osc_b_detune", value*10)
+      engine.macroset("osc_a_detune", -value*20)
+      engine.macroset("osc_b_detune", value*20)
       UI.set_dirty()
     end
   }
@@ -487,6 +486,158 @@ function cleanup()
   params:write()
 end
 
+local function format_percentage(value)
+  return util.round(value*100, 1) .. "%"
+end
+
+local function format_lfo_freq(lfo_freq)
+  local hz
+  if lfo_freq < 1 then
+    local str = tostring(util.round(lfo_freq, 0.001))
+    hz = string.sub(str, 2, #str)
+  elseif lfo_freq < 10 then
+    hz = util.round(lfo_freq, 0.01)
+  else
+    hz = util.round(lfo_freq, 0.1)
+  end
+  return hz.."Hz"
+end
+
+local function format_time(ms)
+  if util.round(ms, 1) >= 1000 then
+    return util.round(ms/1000, 0.1) .. "s"
+  else
+    return util.round(ms, 1) .. "ms"
+  end
+end
+
+local function format_filter_frequency(freq)
+  if util.round(freq, 1) >= 10000 then
+    return util.round(freq/1000, 1) .. "kHz"
+  elseif util.round(freq, 1) >= 1000 then
+    return util.round(freq/1000, 0.1) .. "kHz"
+  else
+    return util.round(freq, 1) .. "Hz"
+  end
+end
+
+local ui_params = {
+  {
+    {
+      label="FREQ",
+      id="filter_frequency",
+      value=function(id)
+        return format_filter_frequency(params:get(id))
+      end
+    },
+    {
+      label="RES",
+      id="filter_resonance",
+      value=function(id)
+        return format_percentage(params:get(id))
+      end
+    }
+  },
+  {
+    {
+      label="A.RNG",
+      id="osc_a_range",
+      value=function(id)
+        return params:string(id)
+      end
+    },
+    {
+      label="B.RNG",
+      id="osc_b_range",
+      value=function(id)
+        return params:string(id)
+      end
+    }
+  },
+  {
+    {
+      label="A.PW",
+      id="osc_a_pulsewidth",
+      value=function(id)
+        return format_percentage(params:get(id))
+      end
+    },
+    {
+      label="B.PW",
+      id="osc_b_pulsewidth",
+      value=function(id)
+        return format_percentage(params:get(id))
+      end
+    }
+  },
+  {
+    {
+      label="DETUN",
+      id="osc_detune",
+      value=function(id)
+        return format_percentage(params:get(id))
+      end
+    },
+    {
+      label="LFO",
+      id="lfo_frequency",
+      value=function(id)
+        return format_lfo_freq(params:get(id))
+      end
+    },
+  },
+  {
+    {
+      label="PWM",
+      id="lfo_to_osc_pwm",
+      value=function(id)
+        return format_percentage(params:get(id))
+      end
+    },
+    {
+      label="E>FIL",
+      id="env_to_filter_fm",
+      value=function(id)
+        return format_percentage(params:get(id))
+      end
+    },
+  },
+  {
+    {
+      label="E.ATK",
+      id="env_attack",
+      value=function(id)
+        return format_time(params:get(id))
+      end
+    },
+    {
+      label="E.DEC",
+      id="env_decay",
+      value=function(id)
+        return format_time(params:get(id))
+      end
+    },
+  },
+  {
+    {
+      label="E.SUS",
+      id="env_sustain",
+      value=function(id)
+        return format_percentage(params:get(id))
+      end
+    },
+    {
+      label="E.REL",
+      id="env_release",
+      value=function(id)
+        return format_time(params:get(id))
+      end
+    }
+  }
+}
+
+local num_pages = #ui_params
+
 function redraw()
   local hi_level = 15
   local lo_level = 4
@@ -522,137 +673,8 @@ function redraw()
     screen.fill()
   end
 
-  local function format_filter_frequency(freq)
-    if util.round(freq, 1) >= 10000 then
-      return util.round(freq/1000, 1) .. "kHz"
-    elseif util.round(freq, 1) >= 1000 then
-      return util.round(freq/1000, 0.1) .. "kHz"
-    else
-      return util.round(freq, 1) .. "Hz"
-    end
-  end
-
-  local function format_filter_resonance(res)
-    return util.round(params:get("filter_resonance")*100, 1) .. "%"
-  end
-
-  local ui_params = {
-    {
-      {
-        label="FREQ",
-        id="filter_frequency",
-        value=function(id)
-          return format_filter_frequency(params:get(id))
-        end
-      },
-      {
-        label="RES",
-        id="filter_resonance",
-        value=function(id)
-          return format_filter_resonance(params:get(id))
-        end
-      }
-    },
-    {
-      {
-        label="A.RNG",
-        id="osc_a_range",
-        value=function(id)
-          return params:string(id)
-        end
-      },
-      {
-        label="B.RNG",
-        id="osc_b_range",
-        value=function(id)
-          return params:string(id)
-        end
-      }
-    },
-    {
-      {
-        label="A.PW",
-        id="osc_a_pulsewidth",
-        value=function(id)
-          return params:string(id)
-        end
-      },
-      {
-        label="B.PW",
-        id="osc_b_pulsewidth",
-        value=function(id)
-          return params:string(id)
-        end
-      }
-    },
-    {
-      {
-        label="DETUNE",
-        id="osc_detune",
-        value=function(id)
-          return params:string(id)
-        end
-      },
-      {
-        label="LFOFREQ",
-        id="lfo_frequency",
-        value=function(id)
-          return params:string(id)
-        end
-      },
-    },
-    {
-      {
-        label="LFO>PW",
-        id="lfo_to_osc_pwm",
-        value=function(id)
-          return params:string(id)
-        end
-      },
-      {
-        label="ENV>FILT.FM",
-        id="env_to_filter_fm",
-        value=function(id)
-          return params:string(id)
-        end
-      },
-    },
-    {
-      {
-        label="ENV.ATK",
-        id="env_attack",
-        value=function(id)
-          return params:string(id)
-        end
-      },
-      {
-        label="ENV.DEC",
-        id="env_decay",
-        value=function(id)
-          return params:string(id)
-        end
-      },
-    },
-    {
-      {
-        label="ENV.SUS",
-        id="env_sustain",
-        value=function(id)
-          return params:string(id)
-        end
-      },
-      {
-        label="ENV.REL",
-        id="env_release",
-        value=function(id)
-          return params:string(id)
-        end
-      }
-    }
-  }
-
   local function draw_ui_param(page, param_index, x, y)
-    local ui_param = ui_params[param_index][page]
+    local ui_param = ui_params[page][param_index]
     screen.move(x, y)
     screen.level(lo_level)
     screen.text(ui_param.label)
@@ -726,7 +748,7 @@ end
 
 function get_current_page_param_id(n)
   local page = util.round(current_page)
-  return params[page][n].id
+  return ui_params[page][n].id
 end
 
 function transition_to_page(page)
