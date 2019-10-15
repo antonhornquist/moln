@@ -349,10 +349,8 @@ local function refresh_ui()
   if target_page then
     current_page = current_page + page_trans_div
     page_trans_frames = page_trans_frames - 1
-    -- print("refresh_ui: current_page="..current_page.." target_page="..target_page.." page_trans_frames="..page_trans_frames)
     if page_trans_frames == 0 then
       current_page = target_page
-      -- print("refresh_ui current_page="..current_page.."!")
       target_page = nil
     end
     UI.set_dirty()
