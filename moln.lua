@@ -17,7 +17,7 @@ Osc B PW
 Osc Detune
 LFO Frequency
 
-LFO>PWM
+LFO > Pulse Width
 Env > Filter Frequency
 
 Env Attack
@@ -384,7 +384,7 @@ local function refresh()
       -- print("refresh current_page="..current_page.."!")
       target_page = nil
     end
-    UI.screen_dirty = true
+    UI.set_dirty()
   end
   UI.refresh()
 end
@@ -532,48 +532,133 @@ function redraw()
     end
   end
 
-  local enc2_params = {
-    {
-      label="FREQ",
-      value=function()
-        return format_filter_frequency(params:get("filter_frequency"))
-      end
-    },
-    {
-      label="A.RNG",
-      value=function()
-        return params:string("osc_a_range")
-      end
-    },
-    {
-      label="A.PW",
-      value=function()
-        return params:string("osc_a_pulsewidth")
-      end
-    }
-  }
-
-  local function draw_label_param_at(label, param, x, y)
-    screen.move(x, y)
-    screen.level(lo_level)
-    screen.text(label)
-    screen.move(x, y+12)
-    screen.level(hi_level)
-    screen.text(param)
-  end
-
   local function format_filter_resonance(res)
     return util.round(params:get("filter_resonance")*100, 1) .. "%"
   end
 
-  local function draw_enc2_label_param_at(index, x, y)
-    local ui_param = enc2_params[index]
+  local ui_params = {
+    {
+      {
+        label="FREQ",
+        id="filter_frequency",
+        value=function(id)
+          return format_filter_frequency(params:get(id))
+        end
+      },
+      {
+        label="RES",
+        id="filter_resonance",
+        value=function(id)
+          return format_filter_resonance(params:get(id))
+        end
+      }
+    },
+    {
+      {
+        label="A.RNG",
+        id="osc_a_range",
+        value=function(id)
+          return params:string(id)
+        end
+      },
+      {
+        label="B.RNG",
+        id="osc_b_range",
+        value=function(id)
+          return params:string(id)
+        end
+      }
+    },
+    {
+      {
+        label="A.PW",
+        id="osc_a_pulsewidth",
+        value=function(id)
+          return params:string(id)
+        end
+      },
+      {
+        label="B.PW",
+        id="osc_b_pulsewidth",
+        value=function(id)
+          return params:string(id)
+        end
+      }
+    },
+    {
+      {
+        label="DETUNE",
+        id="osc_detune",
+        value=function(id)
+          return params:string(id)
+        end
+      },
+      {
+        label="LFOFREQ",
+        id="lfo_frequency",
+        value=function(id)
+          return params:string(id)
+        end
+      },
+    },
+    {
+      {
+        label="LFO>PW",
+        id="lfo_to_osc_pwm",
+        value=function(id)
+          return params:string(id)
+        end
+      },
+      {
+        label="ENV>FILT.FM",
+        id="env_to_filter_fm",
+        value=function(id)
+          return params:string(id)
+        end
+      },
+    },
+    {
+      {
+        label="ENV.ATK",
+        id="env_attack",
+        value=function(id)
+          return params:string(id)
+        end
+      },
+      {
+        label="ENV.DEC",
+        id="env_decay",
+        value=function(id)
+          return params:string(id)
+        end
+      },
+    },
+    {
+      {
+        label="ENV.SUS",
+        id="env_sustain",
+        value=function(id)
+          return params:string(id)
+        end
+      },
+      {
+        label="ENV.REL",
+        id="env_release",
+        value=function(id)
+          return params:string(id)
+        end
+      }
+    }
+  }
+
+  local function draw_ui_param(page, param_index, x, y)
+    local ui_param = ui_params[param_index][page]
     screen.move(x, y)
     screen.level(lo_level)
     screen.text(ui_param.label)
     screen.move(x, y+12)
     screen.level(hi_level)
-    screen.text(ui_param.value())
+    screen.text(ui_param.value(ui_param.id))
   end
 
   local function redraw_enc2_widget()
@@ -582,42 +667,11 @@ function redraw()
     local offset = current_page - left
     local pixel_ofs = util.round(offset*128)
 
-    draw_enc2_label_param_at(left, enc2_x-pixel_ofs, enc2_y)
+    draw_ui_param(left, 1, enc2_x-pixel_ofs, enc2_y)
 
     if left ~= right then
-      draw_enc2_label_param_at(right, enc2_x+128-pixel_ofs, enc2_y)
+      draw_ui_param(right, 1, enc2_x+128-pixel_ofs, enc2_y)
     end
-  end
-
-  local enc3_params = {
-    {
-      label="RES",
-      value=function()
-        return format_filter_resonance(params:get("filter_resonance"))
-      end
-    },
-    {
-      label="B.RNG",
-      value=function()
-        return params:string("osc_b_range")
-      end
-    },
-    {
-      label="B.PW",
-      value=function()
-        return params:string("osc_b_pulsewidth")
-      end
-    }
-  }
-
-  local function draw_enc3_label_param_at(index, x, y)
-    local ui_param = enc3_params[index]
-    screen.move(x, y)
-    screen.level(lo_level)
-    screen.text(ui_param.label)
-    screen.move(x, y+12)
-    screen.level(hi_level)
-    screen.text(ui_param.value())
   end
 
   local function redraw_enc3_widget()
@@ -626,10 +680,10 @@ function redraw()
     local offset = current_page - left
     local pixel_ofs = util.round(offset*128)
 
-    draw_enc3_label_param_at(left, enc3_x-pixel_ofs, enc3_y)
+    draw_ui_param(left, 2, enc3_x-pixel_ofs, enc3_y)
 
     if left ~= right then
-      draw_enc3_label_param_at(right, enc3_x+128-pixel_ofs, enc3_y)
+      draw_ui_param(right, 2, enc3_x+128-pixel_ofs, enc3_y)
     end
   end
     
@@ -672,31 +726,13 @@ end
 
 function get_current_page_param_id(n)
   local page = util.round(current_page)
-  if page == 1 then
-    if n == 1 then
-      return "filter_frequency"
-    elseif n == 2 then
-      return "filter_resonance"
-    end
-  elseif page == 2 then
-    if n == 1 then
-      return "osc_a_range"
-    elseif n == 2 then
-      return "osc_b_range"
-    end
-  elseif page == 3 then
-    if n == 1 then
-      return "osc_a_pulsewidth"
-    elseif n == 2 then
-      return "osc_b_pulsewidth"
-    end
-  end
+  return params[page][n].id
 end
 
 function transition_to_page(page)
   source_page = current_page
   target_page = page
-  page_trans_frames = 12--6
+  page_trans_frames = 12 -- TODO: 6
   page_trans_div = (target_page - source_page) / page_trans_frames
 end
 
@@ -726,9 +762,9 @@ function enc(n, delta)
 end
 
 function key(n, z)
+  local page = util.round(current_page)
   if n == 2 then
     if z == 1 then
-      local page = current_page
       page = page - 1
       if page < 1 then
         page = num_pages
@@ -741,7 +777,6 @@ function key(n, z)
     UI.set_dirty()
   elseif n == 3 then
     if z == 1 then
-      local page = current_page
       page = page + 1
       if page > num_pages then
         page = 1
