@@ -347,14 +347,14 @@ local function init_engine_init_delay_metro()
   engine_init_delay_metro:start()
 end
 
-local function refresh()
+local function refresh_ui()
   if target_page then
     current_page = current_page + page_trans_div
     page_trans_frames = page_trans_frames - 1
-    -- print("refresh: current_page="..current_page.." target_page="..target_page.." page_trans_frames="..page_trans_frames)
+    -- print("refresh_ui: current_page="..current_page.." target_page="..target_page.." page_trans_frames="..page_trans_frames)
     if page_trans_frames == 0 then
       current_page = target_page
-      -- print("refresh current_page="..current_page.."!")
+      -- print("refresh_ui current_page="..current_page.."!")
       target_page = nil
     end
     UI.set_dirty()
@@ -364,7 +364,7 @@ end
 
 local function init_60_fps_ui_refresh_metro()
   local ui_refresh_metro = metro.init()
-  ui_refresh_metro.event = refresh
+  ui_refresh_metro.event = refresh_ui
   ui_refresh_metro.time = 1/60
   ui_refresh_metro:start()
 end
@@ -372,7 +372,7 @@ end
 local function init_ui()
   UI.init_arc {
     device = arc.connect(),
-    delta_callback = function(n, delta)
+    on_delta = function(n, delta)
       local d
       if fine then
         d = delta/5
@@ -381,7 +381,7 @@ local function init_ui()
       end
       change_current_page_param_raw_delta(n, d/500)
     end,
-    refresh_callback = function(my_arc)
+    on_refresh = function(my_arc)
       my_arc:all(0)
       my_arc:led(1, util.round(params:get_raw(get_current_page_param_id(1))*64), 15)
       my_arc:led(2, util.round(params:get_raw(get_current_page_param_id(2))*64), 15)
@@ -390,7 +390,7 @@ local function init_ui()
 
   UI.init_grid {
     device = grid.connect(),
-    key_callback = function(x, y, state)
+    on_key = function(x, y, state)
       if engine_ready then
         local note = gridkey_to_note(x, y, UI.grid_width)
         if state == 1 then
@@ -403,7 +403,7 @@ local function init_ui()
         UI.screen_dirty = true
       end
     end,
-    refresh_callback = function(my_grid)
+    on_refresh = function(my_grid)
       my_grid:all(0)
       for voicenum=1,POLYPHONY do
         local note = note_downs[voicenum]
@@ -417,7 +417,7 @@ local function init_ui()
 
   UI.init_midi {
     device = midi.connect(),
-    event_callback = function (data)
+    on_event = function (data)
       if engine_ready then
         if #data == 0 then return end
         local msg = midi.to_msg(data)
@@ -432,7 +432,7 @@ local function init_ui()
   }
 
   UI.init_screen {
-    refresh_callback = function()
+    on_refresh = function()
       redraw()
     end
   }
@@ -478,10 +478,12 @@ local function format_lfo_freq(lfo_freq)
 end
 
 local function format_time(ms)
-  if util.round(ms, 1) >= 1000 then
-    return util.round(ms/1000, 0.1) .. "s"
-  else
+  if util.round(ms, 1) < 1000 then
     return util.round(ms, 1) .. "ms"
+  elseif util.round(ms, 1) < 10000 then
+    return util.round(ms/1000, 0.01) .. "s"
+  else
+    return util.round(ms/1000, 0.1) .. "s"
   end
 end
 

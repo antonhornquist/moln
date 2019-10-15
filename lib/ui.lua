@@ -1,6 +1,13 @@
--- small utility library for single-grid, single-arc, single-midi device script UIs
--- written to track dirty states of UI, provide a generic refresh function
--- written to not be directly dependent on norns global variables
+-- utility library for single-grid, single-arc, single-midi device script UIs
+-- written to track when UI is invalidated and needs to be refreshed
+-- no dependency to norns global variables
+--
+-- main entry points:
+-- UI.init_arc - invoked if an arc is to be used. has to be passed a device (ie. return value from arc.connect()), and optionally sets up callbacks for receiving enc delta messages (on_delta) and refreshing arc leds (on_refresh) when arc UI is invalidated
+-- UI.init_grid - invoked if a grid is to be used. has to be passed a device (ie. return value from grid.connect()), and optionally sets up callbacks for receiving grid key messages (on_key) and refreshing grid leds (on_refresh) when grid UI is invalidated
+-- UI.init_midi - invoked if a midi device is to be used. has to be passed a device (ie. return value from midi.connect()), and optionally a callback for receiving incoming midi messages (on_event)
+-- UI.init_screen - invoked if norns screen is to be used. has to be passed a callback for refreshing screen (on_refresh) when screen UI is invalidated.
+-- UI.refresh - to be triggered from script recurringly, will check and refresh invalidated UIs and refresh tracked device properties (whether device is connected, device bounds). additionally a flag for whether an incoming event was recently handled (UI.show_event_indicator) is continuously updated.
 
 local UI = {
   -- event indicator flag
@@ -23,7 +30,7 @@ local UI = {
 function UI.refresh()
   UI.update_event_indicator()
 
-  if UI.arc_inited then
+  if UI.arc_is_inited then
     UI.check_arc_connected()
       
     if UI.arc_dirty then
@@ -35,7 +42,7 @@ function UI.refresh()
     end
   end
 
-  if UI.grid_inited then
+  if UI.grid_is_inited then
     UI.check_grid_connected()
     UI.update_grid_width()
 
@@ -48,13 +55,13 @@ function UI.refresh()
     end
   end
 
-  if UI.midi_inited then
+  if UI.midi_is_inited then
     UI.check_midi_connected()
   end
 
   if UI.screen_dirty then
-    if UI.refresh_screen_callback then
-      UI.refresh_screen_callback()
+    if UI.screen_refresh_callback then
+      UI.screen_refresh_callback()
     end
     screen.update()
     UI.screen_dirty = false
@@ -83,11 +90,9 @@ function UI.update_event_indicator()
       event_flash_frame_counter = nil
       UI.show_event_indicator = false
       UI.set_dirty()
-    else
-      if not UI.show_event_indicator then
-        UI.show_event_indicator = true
-        UI.set_dirty()
-      end
+    elseif not UI.show_event_indicator then
+      UI.show_event_indicator = true
+      UI.set_dirty()
     end
   end
 end
@@ -95,18 +100,20 @@ end
 -- arc
 
 function UI.init_arc(config)
+  if config.device == nil then
+    error("init_arc: device is mandatory")
+  end
+
   local arc_device = config.device
 
-  -- TODO: throw error if arc_device is nil
-
-  UI.arc_delta_callback = config.delta_callback
+  UI.arc_delta_callback = config.on_delta
   arc_device.delta = function(n, delta)
     UI.flash_event()
     UI.arc_delta_callback(n, delta)
   end
   UI.arc_device = arc_device
-  UI.arc_refresh_callback = config.refresh_callback
-  UI.arc_inited = true
+  UI.arc_refresh_callback = config.on_refresh
+  UI.arc_is_inited = true
 end
 
 function UI.check_arc_connected()
@@ -120,28 +127,26 @@ end
 -- grid
 
 function UI.init_grid(config)
+  if config.devie == nil then
+    error("init_grid: device is mandatory")
+  end
+
   local grid_device = config.device
 
-  -- TODO: throw error if grid_device is nil
-
-  UI.grid_key_callback = config.key_callback
+  UI.grid_key_callback = config.on_key
   grid_device.key = function(x, y, s)
     UI.flash_event()
     UI.grid_key_callback(x, y, s)
   end
   UI.grid_device = grid_device
-  UI.grid_refresh_callback = config.refresh_callback
-  UI.grid_width_changed_callback = config.width_changed_callback -- TODO: consider just updating grid_width in UI table, defer check for this to scripts
-  UI.grid_inited = true
+  UI.grid_refresh_callback = config.on_refresh
+  UI.grid_is_inited = true
 end
 
 function UI.update_grid_width()
   if UI.grid_device.device then
     if UI.grid_width ~= UI.grid_device.cols then
       UI.grid_width = UI.grid_device.cols
-      if UI.grid_width_changed_callback then
-        UI.grid_width_changed_callback(UI.grid_width)
-      end
     end
   end
 end
@@ -157,17 +162,19 @@ end
 -- midi
 
 function UI.init_midi(config)
+  if config.device == nil then
+    error("init_midi: device is mandatory")
+  end
+
   local midi_device = config.device
 
-  -- TODO: throw error if midi_device is nil
-
-  UI.midi_event_callback = config.event_callback
+  UI.midi_event_callback = config.on_event
   midi_device.event = function(data)
     UI.flash_event()
     UI.midi_event_callback(data)
   end
   UI.midi_device = midi_device
-  UI.midi_inited = true
+  UI.midi_is_inited = true
 end
 
 function UI.check_midi_connected()
@@ -180,7 +187,7 @@ end
 -- screen
 
 function UI.init_screen(config)
-  UI.refresh_screen_callback = config.refresh_callback
+  UI.screen_refresh_callback = config.on_refresh
 end
 
 return UI
