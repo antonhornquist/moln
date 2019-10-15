@@ -14,10 +14,7 @@ local note_downs = {}
 local note_slots = {}
 
 local engine_ready = false
-local trigging = false
-local fine = false
-local lastkeynote
-local alt_held = false
+local fine = false -- TODO
 local current_page = 1
 local fps = 120
 
