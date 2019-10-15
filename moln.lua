@@ -1,32 +1,6 @@
 -- scriptname: moln
 -- v1.1.4 @jah
 
---[[
---
---pages
---
-Filter Frequency
-Filter Resonance
-
-Osc A Range
-Osc B Range
-
-Osc A PW
-Osc B PW
-
-Osc Detune
-LFO Frequency
-
-LFO > Pulse Width
-Env > Filter Frequency
-
-Env Attack
-Env Decay
-
-Env Sustain
-Env Release
-]]
-
 engine.name = 'R'
 
 local ControlSpec = require('controlspec')
@@ -789,9 +763,10 @@ function key(n, z)
     if z == 1 then
       page = page - 1
       if page < 1 then
-        page = num_pages
+        current_page = num_pages
+      else
+        transition_to_page(page)
       end
-      transition_to_page(page)
       prev_held = true
     else
       prev_held = false
@@ -801,9 +776,10 @@ function key(n, z)
     if z == 1 then
       page = page + 1
       if page > num_pages then
-        page = 1
+        current_page = 1
+      else
+        transition_to_page(page)
       end
-      transition_to_page(page)
       next_held = true
     else
       next_held = false
