@@ -19,6 +19,7 @@ local fine = false
 local lastkeynote
 local alt_held = false
 local current_page = 1
+local fps = 120
 
 local function create_modules()
   R.engine.poly_new("FreqGate", "FreqGate", POLYPHONY)
@@ -177,7 +178,7 @@ local function init_params()
     end
   }
 
-  local filter_frequency_spec = R.specs.MMFilter.Frequency:copy()
+  local filter_frequency_spec = R.specs.LPFilter.Frequency:copy()
   filter_frequency_spec.maxval = 8000
   filter_frequency_spec.minval = 10
   filter_frequency_spec.default = 500
@@ -193,7 +194,7 @@ local function init_params()
     end
   }
 
-  local filter_resonance_spec = R.specs.MMFilter.Resonance:copy()
+  local filter_resonance_spec = R.specs.LPFilter.Resonance:copy()
   filter_resonance_spec.default = 0.2
 
   params:add {
@@ -208,7 +209,7 @@ local function init_params()
     end
   }
 
-  local env_to_filter_fm_spec = R.specs.MMFilter.FM
+  local env_to_filter_fm_spec = R.specs.LPFilter.FM
   env_to_filter_fm_spec.default = 0.35
 
   params:add {
@@ -362,10 +363,10 @@ local function refresh_ui()
   UI.refresh()
 end
 
-local function init_60_fps_ui_refresh_metro()
+local function init_ui_refresh_metro()
   local ui_refresh_metro = metro.init()
   ui_refresh_metro.event = refresh_ui
-  ui_refresh_metro.time = 1/60
+  ui_refresh_metro.time = 1/fps
   ui_refresh_metro:start()
 end
 
@@ -437,7 +438,7 @@ local function init_ui()
     end
   }
 
-  init_60_fps_ui_refresh_metro()
+  init_ui_refresh_metro()
   init_engine_init_delay_metro()
 end
 
@@ -464,19 +465,6 @@ local function format_percentage(value)
   return util.round(value*100, 1) .. "%"
 end
 
-local function format_lfo_freq(lfo_freq)
-  local hz
-  if lfo_freq < 1 then
-    local str = tostring(util.round(lfo_freq, 0.001))
-    hz = string.sub(str, 2, #str)
-  elseif lfo_freq < 10 then
-    hz = util.round(lfo_freq, 0.01)
-  else
-    hz = util.round(lfo_freq, 0.1)
-  end
-  return hz.."Hz"
-end
-
 local function format_time(ms)
   if util.round(ms, 1) < 1000 then
     return util.round(ms, 1) .. "ms"
@@ -487,13 +475,20 @@ local function format_time(ms)
   end
 end
 
-local function format_filter_frequency(freq)
-  if util.round(freq, 1) >= 10000 then
-    return util.round(freq/1000, 1) .. "kHz"
-  elseif util.round(freq, 1) >= 1000 then
-    return util.round(freq/1000, 0.1) .. "kHz"
+local function format_freq(hz)
+  if hz < 1 then
+    local str = tostring(util.round(hz, 0.001))
+    return string.sub(str, 2, #str).."Hz"
+  elseif hz < 10 then
+    return util.round(hz, 0.01).."Hz"
+  elseif hz < 100 then
+    return util.round(hz, 0.1).."Hz"
+  elseif hz < 1000 then
+    return util.round(hz, 1).."Hz"
+  elseif hz < 10000 then
+    return util.round(hz/1000, 0.1) .. "kHz"
   else
-    return util.round(freq, 1) .. "Hz"
+    return util.round(hz/1000, 1) .. "kHz"
   end
 end
 
@@ -503,7 +498,7 @@ local ui_params = {
       label="FREQ",
       id="filter_frequency",
       value=function(id)
-        return format_filter_frequency(params:get(id))
+        return format_freq(params:get(id))
       end
     },
     {
@@ -558,7 +553,7 @@ local ui_params = {
       label="LFO",
       id="lfo_frequency",
       value=function(id)
-        return format_lfo_freq(params:get(id))
+        return format_freq(params:get(id))
       end
     },
   },
@@ -622,7 +617,7 @@ function redraw()
   local enc1_y = 12
 
   local enc2_x = 10
-  local enc2_y = 32
+  local enc2_y = 33
 
   local enc3_x = enc2_x+65
   local enc3_y = enc2_y
@@ -685,6 +680,13 @@ function redraw()
     end
   end
     
+  local function redraw_page_indicator()
+    local div = 128/num_pages
+    screen.level(lo_level)
+    screen.rect(util.round((current_page-1)*div), enc2_y+15, util.round(div), 2)
+    screen.fill()
+  end
+
   local function redraw_key2_widget()
     screen.move(key2_x, key2_y)
     if prev_held then
@@ -716,6 +718,9 @@ function redraw()
 
   redraw_enc2_widget()
   redraw_enc3_widget()
+
+  redraw_page_indicator()
+
   redraw_key2_widget()
   redraw_key3_widget()
 
@@ -730,7 +735,7 @@ end
 function transition_to_page(page)
   source_page = current_page
   target_page = page
-  page_trans_frames = 12 -- TODO: 6
+  page_trans_frames = fps/5
   page_trans_div = (target_page - source_page) / page_trans_frames
 end
 
@@ -760,15 +765,27 @@ function enc(n, delta)
 end
 
 function key(n, z)
-  local page = util.round(current_page)
+  local page
+  if target_page then
+    page = target_page
+  else
+    page = util.round(current_page)
+  end
   if n == 2 then
     if z == 1 then
       page = page - 1
+      --[[
       if page < 1 then
         current_page = num_pages
       else
         transition_to_page(page)
       end
+      ]]
+      if page < 1 then
+        page = num_pages
+      end
+      transition_to_page(page)
+
       prev_held = true
     else
       prev_held = false
@@ -777,11 +794,18 @@ function key(n, z)
   elseif n == 3 then
     if z == 1 then
       page = page + 1
+      --[[
       if page > num_pages then
         current_page = 1
       else
         transition_to_page(page)
       end
+      ]]
+      if page > num_pages then
+        page = 1
+      end
+      transition_to_page(page)
+
       next_held = true
     else
       next_held = false

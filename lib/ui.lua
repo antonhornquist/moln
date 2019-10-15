@@ -76,7 +76,7 @@ end
 
 -- event flash
 
-local EVENT_FLASH_FRAMES = 10
+local EVENT_FLASH_FRAMES = 20
 local event_flash_frame_counter = nil
 
 function UI.flash_event()
@@ -127,7 +127,7 @@ end
 -- grid
 
 function UI.init_grid(config)
-  if config.devie == nil then
+  if config.device == nil then
     error("init_grid: device is mandatory")
   end
 
