@@ -38,20 +38,20 @@ local function set_static_module_params()
 end
 
 local function connect_modules()
-  R.engine.poly_connect("FreqGate/Frequency", "OscA/FM", POLYPHONY)
-  R.engine.poly_connect("FreqGate/Frequency", "OscB/FM", POLYPHONY)
-  R.engine.poly_connect("FreqGate/Gate", "Env/Gate", POLYPHONY)
-  R.engine.poly_connect("LFO/Out", "OscA/PWM", POLYPHONY)
-  R.engine.poly_connect("LFO/Out", "OscB/PWM", POLYPHONY)
-  R.engine.poly_connect("Env/Out", "Amp/Lin", POLYPHONY)
-  R.engine.poly_connect("Env/Out", "Filter/FM", POLYPHONY)
-  R.engine.poly_connect("OscA/Out", "Filter/In", POLYPHONY)
-  R.engine.poly_connect("OscB/Out", "Filter/In", POLYPHONY)
-  R.engine.poly_connect("Filter/Out", "Amp/In", POLYPHONY)
+  R.engine.poly_connect("FreqGate/Frequency", "OscA*FM", POLYPHONY)
+  R.engine.poly_connect("FreqGate/Frequency", "OscB*FM", POLYPHONY)
+  R.engine.poly_connect("FreqGate/Gate", "Env*Gate", POLYPHONY)
+  R.engine.poly_connect("LFO/Out", "OscA*PWM", POLYPHONY)
+  R.engine.poly_connect("LFO/Out", "OscB*PWM", POLYPHONY)
+  R.engine.poly_connect("Env/Out", "Amp*Lin", POLYPHONY)
+  R.engine.poly_connect("Env/Out", "Filter*FM", POLYPHONY)
+  R.engine.poly_connect("OscA/Out", "Filter*In", POLYPHONY)
+  R.engine.poly_connect("OscB/Out", "Filter*In", POLYPHONY)
+  R.engine.poly_connect("Filter/Out", "Amp*In", POLYPHONY)
 
   for voicenum=1, POLYPHONY do
-    engine.connect("Amp"..voicenum.."/Out", "SoundOut/Left")
-    engine.connect("Amp"..voicenum.."/Out", "SoundOut/Right")
+    engine.connect("Amp"..voicenum.."/Out", "SoundOut*Left")
+    engine.connect("Amp"..voicenum.."/Out", "SoundOut*Right")
   end
 end
 
