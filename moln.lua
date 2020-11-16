@@ -468,7 +468,7 @@ function redraw()
     screen.text("LEVEL")
     screen.move(enc1_x+45, enc1_y)
     screen.level(hi_level)
-    screen.text(util.round(mix:get_raw("output")*100, 1))
+    screen.text(util.round(params:get_raw("output_level")*100, 1))
   end
 
   local function redraw_event_flash_widget()
@@ -557,7 +557,7 @@ function enc(n, delta)
     d = delta
   end
   if n == 1 then
-    mix:delta("output", d)
+    params:delta("output_level", d)
     UI.screen_dirty = true
   elseif n == 2 then
     params:delta("filter_frequency", d)
