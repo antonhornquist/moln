@@ -4,7 +4,8 @@
 engine.name = 'R'
 
 local R = require 'r/lib/r'
-local UI = require 'moln/lib/ui'
+local r_engine = R.engine
+local r_specs = R.specs
 
 local ControlSpec = require 'controlspec'
 local Formatters = require 'formatters'
@@ -15,40 +16,42 @@ local trigging = false
 local fine = false
 local lastkeynote
 
-local POLYPHONY = 3
+local POLYPHONY = 5
 local note_downs = {}
 local note_slots = {}
 
 local function create_modules()
-  R.engine.poly_new("FreqGate", "FreqGate", POLYPHONY)
-  R.engine.poly_new("LFO", "SineLFO", POLYPHONY)
-  R.engine.poly_new("Env", "ADSREnv", POLYPHONY)
-  R.engine.poly_new("OscA", "PulseOsc", POLYPHONY)
-  R.engine.poly_new("OscB", "PulseOsc", POLYPHONY)
-  R.engine.poly_new("Filter", "LPFilter", POLYPHONY)
-  R.engine.poly_new("Amp", "Amp", POLYPHONY)
+  r_engine.poly_new("FreqGate", "FreqGate", POLYPHONY)
+  r_engine.poly_new("LFO", "SineLFO", POLYPHONY)
+  r_engine.poly_new("Env", "ADSREnv", POLYPHONY)
+  r_engine.poly_new("OscA", "PulseOsc", POLYPHONY)
+  r_engine.poly_new("OscB", "PulseOsc", POLYPHONY)
+  r_engine.poly_new("Filter", "LPFilter", POLYPHONY)
+  r_engine.poly_new("Amp", "Amp", POLYPHONY)
 
+  -- TODO: Amplifier
   engine.new("SoundOut", "SoundOut")
 end
 
 local function set_static_module_params()
-  R.engine.poly_set("OscA.FM", 1, POLYPHONY)
-  R.engine.poly_set("OscB.FM", 1, POLYPHONY)
-  R.engine.poly_set("Filter.AudioLevel", 1, POLYPHONY)
+  r_engine.poly_set("OscA.FM", 1, POLYPHONY)
+  r_engine.poly_set("OscB.FM", 1, POLYPHONY)
+  r_engine.poly_set("Filter.AudioLevel", 1, POLYPHONY)
 end
 
 local function connect_modules()
-  R.engine.poly_connect("FreqGate/Frequency", "OscA*FM", POLYPHONY)
-  R.engine.poly_connect("FreqGate/Frequency", "OscB*FM", POLYPHONY)
-  R.engine.poly_connect("FreqGate/Gate", "Env*Gate", POLYPHONY)
-  R.engine.poly_connect("LFO/Out", "OscA*PWM", POLYPHONY)
-  R.engine.poly_connect("LFO/Out", "OscB*PWM", POLYPHONY)
-  R.engine.poly_connect("Env/Out", "Amp*Lin", POLYPHONY)
-  R.engine.poly_connect("Env/Out", "Filter*FM", POLYPHONY)
-  R.engine.poly_connect("OscA/Out", "Filter*In", POLYPHONY)
-  R.engine.poly_connect("OscB/Out", "Filter*In", POLYPHONY)
-  R.engine.poly_connect("Filter/Out", "Amp*In", POLYPHONY)
+  r_engine.poly_connect("FreqGate/Frequency", "OscA*FM", POLYPHONY)
+  r_engine.poly_connect("FreqGate/Frequency", "OscB*FM", POLYPHONY)
+  r_engine.poly_connect("FreqGate/Gate", "Env*Gate", POLYPHONY)
+  r_engine.poly_connect("LFO/Out", "OscA*PWM", POLYPHONY)
+  r_engine.poly_connect("LFO/Out", "OscB*PWM", POLYPHONY)
+  r_engine.poly_connect("Env/Out", "Amp*Lin", POLYPHONY)
+  r_engine.poly_connect("Env/Out", "Filter*FM", POLYPHONY)
+  r_engine.poly_connect("OscA/Out", "Filter*In", POLYPHONY)
+  r_engine.poly_connect("OscB/Out", "Filter*In", POLYPHONY)
+  r_engine.poly_connect("Filter/Out", "Amp*In", POLYPHONY)
 
+  -- TODO: Amplifier to SoundOut
   for voicenum=1, POLYPHONY do
     engine.connect("Amp"..voicenum.."/Out", "SoundOut*Left")
     engine.connect("Amp"..voicenum.."/Out", "SoundOut*Right")
@@ -74,19 +77,21 @@ local function create_macros()
   engine.newmacro("env_release", R.util.poly_expand("Env.Release", POLYPHONY))
 end
 
-local function init_params()
+local function init_osc_a_range_param()
   params:add {
     type="control",
     id="osc_a_range",
     name="Osc A Range",
-    controlspec=R.specs.PulseOsc.Range,
+    controlspec=r_specs.PulseOsc.Range,
     formatter=Formatters.round(1),
     action=function (value)
       engine.macroset("osc_a_range", value)
     end
   }
+end
 
-  local osc_a_pulsewidth_spec = R.specs.PulseOsc.PulseWidth:copy()
+local function init_osc_a_pulsewidth_param()
+  local osc_a_pulsewidth_spec = r_specs.PulseOsc.PulseWidth:copy()
   osc_a_pulsewidth_spec.default = 0.88
 
   params:add {
@@ -99,19 +104,23 @@ local function init_params()
       engine.macroset("osc_a_pulsewidth", value)
     end
   }
+end
 
+local function init_osc_b_range_param()
   params:add {
     type="control",
     id="osc_b_range",
     name="Osc B Range",
-    controlspec=R.specs.PulseOsc.Range,
+    controlspec=r_specs.PulseOsc.Range,
     formatter=Formatters.round(1),
     action=function (value)
       engine.macroset("osc_b_range", value)
     end
   }
+end
 
-  local osc_b_pulsewidth_spec = R.specs.PulseOsc.PulseWidth:copy()
+local function init_osc_b_pulsewidth_param()
+  local osc_b_pulsewidth_spec = r_specs.PulseOsc.PulseWidth:copy()
   osc_b_pulsewidth_spec.default = 0.61
 
   params:add {
@@ -124,7 +133,9 @@ local function init_params()
       engine.macroset("osc_b_pulsewidth", value)
     end
   }
+end
 
+local function init_osc_detune_param()
   local osc_detune_spec = ControlSpec.UNIPOLAR:copy()
   osc_detune_spec.default = 0.36
 
@@ -139,8 +150,10 @@ local function init_params()
       engine.macroset("osc_b_detune", value*10)
     end
   }
+end
 
-  local lfo_frequency_spec = R.specs.MultiLFO.Frequency:copy()
+local function init_lfo_frequency_param()
+  local lfo_frequency_spec = r_specs.MultiLFO.Frequency:copy()
   lfo_frequency_spec.default = 0.125
 
   params:add {
@@ -153,7 +166,9 @@ local function init_params()
       engine.macroset("lfo_frequency", value)
     end
   }
+end
 
+local function init_lfo_to_osc_pwm_param()
   local lfo_to_osc_pwm_spec = ControlSpec.UNIPOLAR:copy()
   lfo_to_osc_pwm_spec.default = 0.46
 
@@ -168,8 +183,10 @@ local function init_params()
       engine.macroset("osc_b_pwm", value*0.56)
     end
   }
+end
 
-  local filter_frequency_spec = R.specs.MMFilter.Frequency:copy()
+local function init_filter_frequency_param()
+  local filter_frequency_spec = r_specs.MMFilter.Frequency:copy()
   filter_frequency_spec.maxval = 8000
   filter_frequency_spec.minval = 10
   filter_frequency_spec.default = 500
@@ -181,12 +198,13 @@ local function init_params()
     controlspec=filter_frequency_spec,
     action=function (value)
       engine.macroset("filter_frequency", value)
-      UI.arc_dirty = true
-      UI.screen_dirty = true
+      ui_dirty = true
     end
   }
+end
 
-  local filter_resonance_spec = R.specs.MMFilter.Resonance:copy()
+local function init_filter_resonance_param()
+  local filter_resonance_spec = r_specs.MMFilter.Resonance:copy()
   filter_resonance_spec.default = 0.2
 
   params:add {
@@ -197,12 +215,13 @@ local function init_params()
     formatter=Formatters.percentage,
     action=function (value)
       engine.macroset("filter_resonance", value)
-      UI.arc_dirty = true
-      UI.screen_dirty = true
+      ui_dirty = true
     end
   }
+end
 
-  local env_to_filter_fm_spec = R.specs.MMFilter.FM
+local function init_env_to_filter_fm_param()
+  local env_to_filter_fm_spec = r_specs.MMFilter.FM
   env_to_filter_fm_spec.default = 0.35
 
   params:add {
@@ -215,8 +234,10 @@ local function init_params()
       engine.macroset("env_to_filter_fm", value)
     end
   }
+end
 
-  local env_attack_spec = R.specs.ADSREnv.Attack:copy()
+local function init_env_attack_param()
+  local env_attack_spec = r_specs.ADSREnv.Attack:copy()
   env_attack_spec.default = 1
 
   params:add {
@@ -228,8 +249,10 @@ local function init_params()
       engine.macroset("env_attack", value)
     end
   }
+end
 
-  local env_decay_spec = R.specs.ADSREnv.Decay:copy()
+local function init_env_decay_param()
+  local env_decay_spec = r_specs.ADSREnv.Decay:copy()
   env_decay_spec.default = 200
 
   params:add {
@@ -241,8 +264,10 @@ local function init_params()
       engine.macroset("env_decay", value)
     end
   }
+end
 
-  local env_sustain_spec = R.specs.ADSREnv.Sustain:copy()
+local function init_env_sustain_param()
+  local env_sustain_spec = r_specs.ADSREnv.Sustain:copy()
   env_sustain_spec.default = 0.5
 
   params:add {
@@ -255,8 +280,10 @@ local function init_params()
       engine.macroset("env_sustain", value)
     end
   }
+end
 
-  local env_release_spec = R.specs.ADSREnv.Release:copy()
+local function init_env_release_param()
+  local env_release_spec = r_specs.ADSREnv.Release:copy()
   env_release_spec.default = 500
 
   params:add {
@@ -270,6 +297,23 @@ local function init_params()
   }
 end
 
+local function init_params()
+  init_osc_a_range_param()
+  init_osc_a_pulsewidth_param()
+  init_osc_b_range_param()
+  init_osc_b_pulsewidth_param()
+  init_osc_detune_param()
+  init_lfo_frequency_param()
+  init_lfo_to_osc_pwm_param()
+  init_filter_frequency_param()
+  init_filter_resonance_param()
+  init_env_to_filter_fm_param()
+  init_env_attack_param()
+  init_env_decay_param()
+  init_env_sustain_param()
+  init_env_release_param()
+end
+
 local function release_voice(voicenum)
   engine.bulkset("FreqGate"..voicenum..".Gate 0")
 end
@@ -279,11 +323,11 @@ local function to_hz(note)
   return 27.5 * 2^exp
 end
 
-local function note_on(note, velocity)
-  local function trig_voice(voicenum, note)
-    engine.bulkset("FreqGate"..voicenum..".Gate 1 FreqGate"..voicenum..".Frequency "..to_hz(note))
-  end
+local function trig_voice(voicenum, note)
+  engine.bulkset("FreqGate"..voicenum..".Gate 1 FreqGate"..voicenum..".Frequency "..to_hz(note))
+end
 
+local function note_on(note, velocity)
   if not note_slots[note] then
     local slot = voice_allocator:get()
     local voicenum = slot.id
@@ -294,7 +338,7 @@ local function note_on(note, velocity)
     end
     note_slots[note] = slot
     note_downs[voicenum] = note
-    UI.screen_dirty = true
+    ui_dirty = true
   end
 end
 
@@ -303,7 +347,7 @@ local function note_off(note)
   if slot then
     voice_allocator:release(slot)
     note_downs[slot.id] = nil
-    UI.screen_dirty = true
+    ui_dirty = true
   end
 end
 
@@ -327,99 +371,140 @@ local function init_engine_init_delay_metro()
   local engine_init_delay_metro = metro.init()
   engine_init_delay_metro.event = function()
     engine_ready = true
-
-    UI.set_dirty()
-
+    ui_dirty = true
     engine_init_delay_metro:stop()
   end
   engine_init_delay_metro.time = 1
   engine_init_delay_metro:start()
 end
 
+-- event flash
+
+local EVENT_FLASH_FRAMES = 10
+local show_event_indicator = false
+local event_flash_frame_counter = nil
+
+function flash_event()
+  event_flash_frame_counter = EVENT_FLASH_FRAMES
+end
+  
+function update_event_indicator()
+  if event_flash_frame_counter then
+    event_flash_frame_counter = event_flash_frame_counter - 1
+    if event_flash_frame_counter == 0 then
+      event_flash_frame_counter = nil
+      show_event_indicator = false
+      ui_dirty = true
+    else
+      if not show_event_indicator then
+        show_event_indicator = true
+        ui_dirty = true
+      end
+    end
+  end
+end
+
+local function update_grid_width()
+  if grid_device.device then
+    if grid_width ~= grid_device.cols then
+      grid_width = grid_device.cols
+    end
+  end
+end
+
+function refresh_ui()
+  update_event_indicator()
+
+  update_grid_width()
+
+  if ui_dirty then
+    redraw()
+
+    arc_device:all(0)
+    arc_device:led(1, util.round(params:get_raw("filter_frequency")*64), 15)
+    arc_device:led(2, util.round(params:get_raw("filter_resonance")*64), 15)
+    arc_device:refresh()
+
+    grid_device:all(0)
+    for voicenum=1,POLYPHONY do
+      local note = note_downs[voicenum]
+      if note then
+        local x, y = note_to_gridkey(note, grid_width)
+        grid_device:led(x, y, 15)
+      end
+    end
+    grid_device:refresh()
+
+    ui_dirty = false
+  end
+end
+
 local function init_60_fps_ui_refresh_metro()
   local ui_refresh_metro = metro.init()
-  ui_refresh_metro.event = UI.refresh
+  ui_refresh_metro.event = refresh_ui
   ui_refresh_metro.time = 1/60
   ui_refresh_metro:start()
 end
 
-local function init_ui()
-  UI.init_arc {
-    device = arc.connect(),
-    delta_callback = function(n, delta)
-      local d
-      if fine then
-        d = delta/5
+local function init_arc()
+  arc_device = arc.connect()
+  arc_device.delta = function(n, delta)
+    local d
+    if fine then
+      d = delta/5
+    else
+      d = delta
+    end
+    if n == 1 then
+      local val = params:get_raw("filter_frequency")
+      params:set_raw("filter_frequency", val+d/500)
+    elseif n == 2 then
+      local val = params:get_raw("filter_resonance")
+      params:set_raw("filter_resonance", val+d/500)
+    end
+
+    flash_event()
+    ui_dirty = true
+  end
+end
+
+local function init_grid()
+  grid_device = grid.connect()
+  grid_device.key = function(x, y, state)
+    if engine_ready then
+      local note = gridkey_to_note(x, y, grid_width)
+      if state == 1 then
+        note_on(note, 5)
       else
-        d = delta
+        note_off(note)
       end
-      if n == 1 then
-        local val = params:get_raw("filter_frequency")
-        params:set_raw("filter_frequency", val+d/500)
-      elseif n == 2 then
-        local val = params:get_raw("filter_resonance")
-        params:set_raw("filter_resonance", val+d/500)
-      end
-
-      UI.arc_dirty = true
-      UI.screen_dirty = true
-    end,
-    refresh_callback = function(my_arc)
-      my_arc:all(0)
-      my_arc:led(1, util.round(params:get_raw("filter_frequency")*64), 15)
-      my_arc:led(2, util.round(params:get_raw("filter_resonance")*64), 15)
+      ui_dirty = true
     end
-  }
+    flash_event()
+  end
+end
 
-  UI.init_grid {
-    device = grid.connect(),
-    key_callback = function(x, y, state)
-      if engine_ready then
-        local note = gridkey_to_note(x, y, UI.grid_width)
-        if state == 1 then
-          note_on(note, 5)
-        else
-          note_off(note)
-        end
-
-        UI.grid_dirty = true
-        UI.screen_dirty = true
+local function init_midi()
+  midi_device = midi.connect()
+  midi_device.event = function (data)
+    if engine_ready then
+      if #data == 0 then return end
+      local msg = midi.to_msg(data)
+      if msg.type == "note_off" then
+        note_off(msg.note)
+      elseif msg.type == "note_on" then
+        note_on(msg.note, msg.vel / 127)
       end
-    end,
-    refresh_callback = function(my_grid)
-      my_grid:all(0)
-      for voicenum=1,POLYPHONY do
-        local note = note_downs[voicenum]
-        if note then
-          local x, y = note_to_gridkey(note, UI.grid_width)
-          my_grid:led(x, y, 15)
-        end
-      end
+      ui_dirty = true
     end
-  }
+    flash_event()
+  end
+end
 
-  UI.init_midi {
-    device = midi.connect(),
-    event_callback = function (data)
-      if engine_ready then
-        if #data == 0 then return end
-        local msg = midi.to_msg(data)
-        if msg.type == "note_off" then
-          note_off(msg.note)
-        elseif msg.type == "note_on" then
-          note_on(msg.note, msg.vel / 127)
-        end
-        UI.screen_dirty = true
-      end
-    end
-  }
-
-  UI.init_screen {
-    refresh_callback = function()
-      redraw()
-    end
-  }
-
+local function init_ui()
+  init_arc()
+  init_grid()
+  init_midi()
   init_60_fps_ui_refresh_metro()
   init_engine_init_delay_metro()
 end
@@ -447,7 +532,7 @@ function redraw()
   local hi_level = 15
   local lo_level = 4
 
-  local enc1_x = 0
+  local enc1_x = 1
   local enc1_y = 12
 
   local enc2_x = 10
@@ -456,7 +541,7 @@ function redraw()
   local enc3_x = enc2_x+65
   local enc3_y = enc2_y
 
-  local key2_x = 0
+  local key2_x = 1
   local key2_y = 63
 
   local key3_x = key2_x+65
@@ -537,7 +622,7 @@ function redraw()
 
   redraw_enc1_widget()
 
-  if UI.show_event_indicator then
+  if show_event_indicator then
     redraw_event_flash_widget()
   end
 
@@ -558,7 +643,7 @@ function enc(n, delta)
   end
   if n == 1 then
     params:delta("output_level", d)
-    UI.screen_dirty = true
+    ui_dirty = true
   elseif n == 2 then
     params:delta("filter_frequency", d)
   elseif n == 3 then
@@ -573,21 +658,19 @@ function key(n, z)
     else
       fine = false
     end
-    UI.screen_dirty = true
+    ui_dirty = true
   elseif n == 3 then
     if engine_ready then
       if z == 1 then
         lastkeynote = math.random(60) + 20
         note_on(lastkeynote, 100)
         trigging = true
-        UI.screen_dirty = true
-        UI.grid_dirty = true
+        ui_dirty = true
       else
         if lastkeynote then
           note_off(lastkeynote)
           trigging = false
-          UI.screen_dirty = true
-          UI.grid_dirty = true
+          ui_dirty = true
         end
       end
     end
