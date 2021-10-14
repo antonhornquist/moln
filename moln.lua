@@ -1,5 +1,5 @@
 -- scriptname: moln
--- v1.1.4 @jah
+-- v1.1.5 @jah
 
 engine.name = 'R'
 
@@ -378,8 +378,6 @@ local function init_engine_init_delay_metro()
   engine_init_delay_metro:start()
 end
 
--- event flash
-
 local EVENT_FLASH_FRAMES = 10
 local show_event_indicator = false
 local event_flash_frame_counter = nil
@@ -412,29 +410,33 @@ local function update_grid_width()
   end
 end
 
+local function refresh_arc()
+  arc_device:all(0)
+  arc_device:led(1, util.round(params:get_raw("filter_frequency")*64), 15) -- TODO: bug?
+  arc_device:led(2, util.round(params:get_raw("filter_resonance")*64), 15) -- TODO: bug?
+  arc_device:refresh()
+end
+
+local function refresh_grid()
+  grid_device:all(0)
+  for voicenum=1,POLYPHONY do
+    local note = note_downs[voicenum]
+    if note then
+      local x, y = note_to_gridkey(note, grid_width)
+      grid_device:led(x, y, 15)
+    end
+  end
+  grid_device:refresh()
+end
+
 function refresh_ui()
   update_event_indicator()
-
   update_grid_width()
 
   if ui_dirty then
     redraw()
-
-    arc_device:all(0)
-    arc_device:led(1, util.round(params:get_raw("filter_frequency")*64), 15)
-    arc_device:led(2, util.round(params:get_raw("filter_resonance")*64), 15)
-    arc_device:refresh()
-
-    grid_device:all(0)
-    for voicenum=1,POLYPHONY do
-      local note = note_downs[voicenum]
-      if note then
-        local x, y = note_to_gridkey(note, grid_width)
-        grid_device:led(x, y, 15)
-      end
-    end
-    grid_device:refresh()
-
+    refresh_arc()
+    refresh_grid()
     ui_dirty = false
   end
 end
