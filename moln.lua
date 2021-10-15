@@ -361,9 +361,9 @@ end
 
 local function note_to_gridkey(note, grid_width)
   if grid_width == 16 then
-    return math.floor(note/8), note % 8
+    return math.floor((note - 1) / 8), ((note - 1) % 8) + 1
   else
-    return math.floor(note/8) - 4, note % 8
+    return math.floor((note - 1) / 8) - 4, ((note - 1) % 8) + 1
   end
 end
 
