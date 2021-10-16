@@ -1,11 +1,12 @@
 -- scriptname: moln
--- v1.1.5 @jah
+-- v1.2.0 @jah
 
 engine.name = 'R'
 
 local R = require 'r/lib/r'
 local r_engine = R.engine
 local r_specs = R.specs
+local r_util = R.util
 
 local ControlSpec = require 'controlspec'
 local Formatters = require 'formatters'
@@ -20,6 +21,8 @@ local POLYPHONY = 5
 local note_downs = {}
 local note_slots = {}
 
+local grid_width
+
 local function create_modules()
   r_engine.poly_new("FreqGate", "FreqGate", POLYPHONY)
   r_engine.poly_new("LFO", "SineLFO", POLYPHONY)
@@ -29,7 +32,7 @@ local function create_modules()
   r_engine.poly_new("Filter", "LPFilter", POLYPHONY)
   r_engine.poly_new("Amp", "Amp", POLYPHONY)
 
-  -- TODO: Amplifier
+  engine.new("OutputGain", "SGain")
   engine.new("SoundOut", "SoundOut")
 end
 
@@ -51,30 +54,31 @@ local function connect_modules()
   r_engine.poly_connect("OscB/Out", "Filter*In", POLYPHONY)
   r_engine.poly_connect("Filter/Out", "Amp*In", POLYPHONY)
 
-  -- TODO: Amplifier to SoundOut
   for voicenum=1, POLYPHONY do
-    engine.connect("Amp"..voicenum.."/Out", "SoundOut*Left")
-    engine.connect("Amp"..voicenum.."/Out", "SoundOut*Right")
+    engine.connect("Amp"..voicenum.."/Out", "OutputGain*Left")
+    engine.connect("Amp"..voicenum.."/Out", "OutputGain*Right")
   end
+  engine.connect("OutputGain/Left", "SoundOut*Left")
+  engine.connect("OutputGain/Right", "SoundOut*Right")
 end
 
 local function create_macros()
-  engine.newmacro("osc_a_range", R.util.poly_expand("OscA.Range", POLYPHONY))
-  engine.newmacro("osc_a_pulsewidth", R.util.poly_expand("OscA.PulseWidth", POLYPHONY))
-  engine.newmacro("osc_b_range", R.util.poly_expand("OscB.Range", POLYPHONY))
-  engine.newmacro("osc_b_pulsewidth", R.util.poly_expand("OscB.PulseWidth", POLYPHONY))
-  engine.newmacro("osc_a_detune", R.util.poly_expand("OscA.Tune", POLYPHONY))
-  engine.newmacro("osc_b_detune", R.util.poly_expand("OscB.Tune", POLYPHONY))
-  engine.newmacro("lfo_frequency", R.util.poly_expand("LFO.Frequency", POLYPHONY))
-  engine.newmacro("osc_a_pwm", R.util.poly_expand("OscA.PWM", POLYPHONY))
-  engine.newmacro("osc_b_pwm", R.util.poly_expand("OscB.PWM", POLYPHONY))
-  engine.newmacro("filter_frequency", R.util.poly_expand("Filter.Frequency", POLYPHONY))
-  engine.newmacro("filter_resonance", R.util.poly_expand("Filter.Resonance", POLYPHONY))
-  engine.newmacro("env_to_filter_fm", R.util.poly_expand("Filter.FM", POLYPHONY))
-  engine.newmacro("env_attack", R.util.poly_expand("Env.Attack", POLYPHONY))
-  engine.newmacro("env_decay", R.util.poly_expand("Env.Decay", POLYPHONY))
-  engine.newmacro("env_sustain", R.util.poly_expand("Env.Sustain", POLYPHONY))
-  engine.newmacro("env_release", R.util.poly_expand("Env.Release", POLYPHONY))
+  engine.newmacro("osc_a_range", r_util.poly_expand("OscA.Range", POLYPHONY))
+  engine.newmacro("osc_a_pulsewidth", r_util.poly_expand("OscA.PulseWidth", POLYPHONY))
+  engine.newmacro("osc_b_range", r_util.poly_expand("OscB.Range", POLYPHONY))
+  engine.newmacro("osc_b_pulsewidth", r_util.poly_expand("OscB.PulseWidth", POLYPHONY))
+  engine.newmacro("osc_a_detune", r_util.poly_expand("OscA.Tune", POLYPHONY))
+  engine.newmacro("osc_b_detune", r_util.poly_expand("OscB.Tune", POLYPHONY))
+  engine.newmacro("lfo_frequency", r_util.poly_expand("LFO.Frequency", POLYPHONY))
+  engine.newmacro("osc_a_pwm", r_util.poly_expand("OscA.PWM", POLYPHONY))
+  engine.newmacro("osc_b_pwm", r_util.poly_expand("OscB.PWM", POLYPHONY))
+  engine.newmacro("filter_frequency", r_util.poly_expand("Filter.Frequency", POLYPHONY))
+  engine.newmacro("filter_resonance", r_util.poly_expand("Filter.Resonance", POLYPHONY))
+  engine.newmacro("env_to_filter_fm", r_util.poly_expand("Filter.FM", POLYPHONY))
+  engine.newmacro("env_attack", r_util.poly_expand("Env.Attack", POLYPHONY))
+  engine.newmacro("env_decay", r_util.poly_expand("Env.Decay", POLYPHONY))
+  engine.newmacro("env_sustain", r_util.poly_expand("Env.Sustain", POLYPHONY))
+  engine.newmacro("env_release", r_util.poly_expand("Env.Release", POLYPHONY))
 end
 
 local function init_osc_a_range_param()
@@ -91,14 +95,14 @@ local function init_osc_a_range_param()
 end
 
 local function init_osc_a_pulsewidth_param()
-  local osc_a_pulsewidth_spec = r_specs.PulseOsc.PulseWidth:copy()
-  osc_a_pulsewidth_spec.default = 0.88
+  local spec = r_specs.PulseOsc.PulseWidth:copy()
+  spec.default = 0.88
 
   params:add {
     type="control",
     id="osc_a_pulsewidth",
     name="Osc A PulseWidth",
-    controlspec=osc_a_pulsewidth_spec,
+    controlspec=spec,
     formatter=Formatters.percentage,
     action=function (value)
       engine.macroset("osc_a_pulsewidth", value)
@@ -120,14 +124,14 @@ local function init_osc_b_range_param()
 end
 
 local function init_osc_b_pulsewidth_param()
-  local osc_b_pulsewidth_spec = r_specs.PulseOsc.PulseWidth:copy()
-  osc_b_pulsewidth_spec.default = 0.61
+  local spec = r_specs.PulseOsc.PulseWidth:copy()
+  spec.default = 0.61
 
   params:add {
     type="control",
     id="osc_b_pulsewidth",
     name="Osc B PulseWidth",
-    controlspec=osc_b_pulsewidth_spec,
+    controlspec=spec,
     formatter=Formatters.percentage,
     action=function (value)
       engine.macroset("osc_b_pulsewidth", value)
@@ -136,14 +140,14 @@ local function init_osc_b_pulsewidth_param()
 end
 
 local function init_osc_detune_param()
-  local osc_detune_spec = ControlSpec.UNIPOLAR:copy()
-  osc_detune_spec.default = 0.36
+  local spec = ControlSpec.UNIPOLAR:copy()
+  spec.default = 0.36
 
   params:add {
     type="control",
     id="osc_detune",
     name="Detune",
-    controlspec=osc_detune_spec,
+    controlspec=spec,
     formatter=Formatters.percentage,
     action=function (value)
       engine.macroset("osc_a_detune", -value*10)
@@ -153,14 +157,14 @@ local function init_osc_detune_param()
 end
 
 local function init_lfo_frequency_param()
-  local lfo_frequency_spec = r_specs.MultiLFO.Frequency:copy()
-  lfo_frequency_spec.default = 0.125
+  local spec = r_specs.MultiLFO.Frequency:copy()
+  spec.default = 0.125
 
   params:add {
     type="control",
     id="lfo_frequency",
     name="PWM Rate",
-    controlspec=lfo_frequency_spec,
+    controlspec=spec,
     formatter=Formatters.round(0.001),
     action=function (value)
       engine.macroset("lfo_frequency", value)
@@ -169,14 +173,14 @@ local function init_lfo_frequency_param()
 end
 
 local function init_lfo_to_osc_pwm_param()
-  local lfo_to_osc_pwm_spec = ControlSpec.UNIPOLAR:copy()
-  lfo_to_osc_pwm_spec.default = 0.46
+  local spec = ControlSpec.UNIPOLAR:copy()
+  spec.default = 0.46
 
   params:add {
     type="control",
     id="lfo_to_osc_pwm",
     name="PWM Depth",
-    controlspec=lfo_to_osc_pwm_spec,
+    controlspec=spec,
     formatter=Formatters.percentage,
     action=function (value)
       engine.macroset("osc_a_pwm", value*0.76)
@@ -186,16 +190,16 @@ local function init_lfo_to_osc_pwm_param()
 end
 
 local function init_filter_frequency_param()
-  local filter_frequency_spec = r_specs.MMFilter.Frequency:copy()
-  filter_frequency_spec.maxval = 8000
-  filter_frequency_spec.minval = 10
-  filter_frequency_spec.default = 500
+  local spec = r_specs.MMFilter.Frequency:copy()
+  spec.maxval = 8000
+  spec.minval = 10
+  spec.default = 500
 
   params:add {
     type="control",
     id="filter_frequency",
     name="Filter Frequency",
-    controlspec=filter_frequency_spec,
+    controlspec=spec,
     action=function (value)
       engine.macroset("filter_frequency", value)
       ui_dirty = true
@@ -204,14 +208,14 @@ local function init_filter_frequency_param()
 end
 
 local function init_filter_resonance_param()
-  local filter_resonance_spec = r_specs.MMFilter.Resonance:copy()
-  filter_resonance_spec.default = 0.2
+  local spec = r_specs.MMFilter.Resonance:copy()
+  spec.default = 0.2
 
   params:add {
     type="control",
     id="filter_resonance",
     name="Filter Resonance",
-    controlspec=filter_resonance_spec,
+    controlspec=spec,
     formatter=Formatters.percentage,
     action=function (value)
       engine.macroset("filter_resonance", value)
@@ -221,14 +225,14 @@ local function init_filter_resonance_param()
 end
 
 local function init_env_to_filter_fm_param()
-  local env_to_filter_fm_spec = r_specs.MMFilter.FM
-  env_to_filter_fm_spec.default = 0.35
+  local spec = r_specs.MMFilter.FM
+  spec.default = 0.35
 
   params:add {
     type="control",
     id="env_to_filter_fm",
     name="Env > Filter Frequency",
-    controlspec=env_to_filter_fm_spec,
+    controlspec=spec,
     formatter=Formatters.percentage,
     action=function (value)
       engine.macroset("env_to_filter_fm", value)
@@ -237,14 +241,14 @@ local function init_env_to_filter_fm_param()
 end
 
 local function init_env_attack_param()
-  local env_attack_spec = r_specs.ADSREnv.Attack:copy()
-  env_attack_spec.default = 1
+  local spec = r_specs.ADSREnv.Attack:copy()
+  spec.default = 1
 
   params:add {
     type="control",
     id="env_attack",
     name="Env Attack",
-    controlspec=env_attack_spec,
+    controlspec=spec,
     action=function (value)
       engine.macroset("env_attack", value)
     end
@@ -252,14 +256,14 @@ local function init_env_attack_param()
 end
 
 local function init_env_decay_param()
-  local env_decay_spec = r_specs.ADSREnv.Decay:copy()
-  env_decay_spec.default = 200
+  local spec = r_specs.ADSREnv.Decay:copy()
+  spec.default = 200
 
   params:add {
     type="control",
     id="env_decay",
     name="Env Decay",
-    controlspec=env_decay_spec,
+    controlspec=spec,
     action=function (value)
       engine.macroset("env_decay", value)
     end
@@ -267,14 +271,14 @@ local function init_env_decay_param()
 end
 
 local function init_env_sustain_param()
-  local env_sustain_spec = r_specs.ADSREnv.Sustain:copy()
-  env_sustain_spec.default = 0.5
+  local spec = r_specs.ADSREnv.Sustain:copy()
+  spec.default = 0.5
 
   params:add {
     type="control",
     id="env_sustain",
     name="Env Sustain",
-    controlspec=env_sustain_spec,
+    controlspec=spec,
     formatter=Formatters.percentage,
     action=function (value)
       engine.macroset("env_sustain", value)
@@ -283,16 +287,32 @@ local function init_env_sustain_param()
 end
 
 local function init_env_release_param()
-  local env_release_spec = r_specs.ADSREnv.Release:copy()
-  env_release_spec.default = 500
+  local spec = r_specs.ADSREnv.Release:copy()
+  spec.default = 500
 
   params:add {
     type="control",
     id="env_release",
     name="Env Release",
-    controlspec=env_release_spec,
+    controlspec=spec,
     action=function (value)
       engine.macroset("env_release", value)
+    end
+  }
+end
+
+local function init_moln_output_level_param()
+  local spec = r_specs.SGain.Gain:copy()
+  spec.default = -10
+
+  params:add {
+    type="control",
+    id="moln_output_level",
+    name="Output Level",
+    controlspec=spec,
+    formatter=Formatters.round(0.1),
+    action=function (value)
+      engine.set("OutputGain.Gain", value)
     end
   }
 end
@@ -312,6 +332,7 @@ local function init_params()
   init_env_decay_param()
   init_env_sustain_param()
   init_env_release_param()
+  init_moln_output_level_param()
 end
 
 local function release_voice(voicenum)
@@ -355,7 +376,7 @@ local function gridkey_to_note(x, y, grid_width)
   if grid_width == 16 then
     return x * 8 + y
   else
-    return (4+x) * 8 + y
+    return (4 + x) * 8 + y
   end
 end
 
@@ -555,7 +576,7 @@ function redraw()
     screen.text("LEVEL")
     screen.move(enc1_x+45, enc1_y)
     screen.level(hi_level)
-    screen.text(util.round(params:get_raw("output_level")*100, 1))
+    screen.text(util.round(params:get_raw("moln_output_level")*100, 1))
   end
 
   local function redraw_event_flash_widget()
@@ -644,7 +665,7 @@ function enc(n, delta)
     d = delta
   end
   if n == 1 then
-    params:delta("output_level", d)
+    params:delta("moln_output_level", d)
     ui_dirty = true
   elseif n == 2 then
     params:delta("filter_frequency", d)
