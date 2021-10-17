@@ -1,6 +1,3 @@
----
----
-
 # Moln
 
 Polyphonic subtractive synthesizer
