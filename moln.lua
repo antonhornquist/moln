@@ -433,8 +433,8 @@ end
 
 local function refresh_arc()
   arc_device:all(0)
-  arc_device:led(1, util.round(params:get_raw("filter_frequency")*64), 15) -- TODO: bug?
-  arc_device:led(2, util.round(params:get_raw("filter_resonance")*64), 15) -- TODO: bug?
+  arc_device:led(1, util.round(params:get_raw("filter_frequency")*64), 15)
+  arc_device:led(2, util.round(params:get_raw("filter_resonance")*64), 15)
   arc_device:refresh()
 end
 
