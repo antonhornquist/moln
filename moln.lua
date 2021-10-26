@@ -594,9 +594,7 @@ local
 init_midi =
 function()
   midi_device = midi.connect()
-  midi_device.event =
-   =
-   function(data)
+  midi_device.event = function(data)
     flash_event()
     if engine_ready then
       if #data == 0 then return end
