@@ -10,8 +10,6 @@ local ControlSpec = require 'controlspec'
 local Formatters = require 'formatters'
 local Voice = require 'voice'
 
--- TODO: grid specs?
-
 local grid_led_x_spec = ControlSpec.new(1, 16, ControlSpec.WARP_LIN, 1, 0, "")
 local grid_led_y_spec = ControlSpec.new(1, 16, ControlSpec.WARP_LIN, 1, 0, "")
 local grid_led_l_spec = ControlSpec.new(0, 15, ControlSpec.WARP_LIN, 1, 0, "")
