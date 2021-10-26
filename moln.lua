@@ -12,6 +12,9 @@ local Voice = require 'voice'
 
 -- TODO: grid specs?
 
+local grid_led_x_spec = ControlSpec.new(1, 16, ControlSpec.WARP_LIN, 1, 0, "")
+local grid_led_y_spec = ControlSpec.new(1, 16, ControlSpec.WARP_LIN, 1, 0, "")
+local grid_led_l_spec = ControlSpec.new(0, 15, ControlSpec.WARP_LIN, 1, 0, "")
 local arc_led_x_spec = ControlSpec.new(1, 64, ControlSpec.WARP_LIN, 1, 0, "")
 local arc_led_l_spec = ControlSpec.new(0, 15, ControlSpec.WARP_LIN, 1, 0, "")
 
@@ -33,8 +36,6 @@ local refresh_rate = 60
 local event_flash_duration = 0.15 
 local show_event_indicator = false
 local event_flash_frame_counter = nil
-
-
 
 local
 create_modules =
@@ -529,7 +530,7 @@ function()
     local note = note_downs[voicenum]
     if note then
       local x, y = note_to_gridkey(note, grid_width)
-      grid_device:led(x, y, 15)
+      grid_device:led(grid_led_x_spec:constrain(x), grid_led_y_spec:constrain(y), grid_led_l_spec.maxval)
     end
   end
   grid_device:refresh()
