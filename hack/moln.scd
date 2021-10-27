@@ -512,28 +512,6 @@ note_to_gridkey =
 };
 
 var
-init_engine_init_delay_metro =
-{
-	var engine_init_delay_metro = ~metro.init_();
-	engine_init_delay_metro[\event] = {
-		engine_ready = true;
-		ui_dirty = true;
-		engine_init_delay_metro.stop_();
-	};
-	engine_init_delay_metro.time = 1;
-	engine_init_delay_metro.start_();
-};
-
-var
-init_ui_refresh_metro =
-{
-	var ui_refresh_metro = ~metro.init_();
-	ui_refresh_metro.event = refresh_ui;
-	ui_refresh_metro.time = 1/refresh_rate;
-	ui_refresh_metro.start_();
-};
-
-var
 flash_event =
 {
 	event_flash_frame_counter = event_flash_duration * refresh_rate;
@@ -723,6 +701,28 @@ TODO
 };
 
 var
+init_engine_init_delay_metro =
+{
+	var engine_init_delay_metro = ~metro.init_();
+	engine_init_delay_metro[\event] = {
+		engine_ready = true;
+		ui_dirty = true;
+		engine_init_delay_metro.stop_();
+	};
+	engine_init_delay_metro.time = 1;
+	engine_init_delay_metro.start_();
+};
+
+var
+init_ui_refresh_metro =
+{
+	var ui_refresh_metro = ~metro.init_();
+	ui_refresh_metro.event = refresh_ui;
+	ui_refresh_metro.time = 1/refresh_rate;
+	ui_refresh_metro.start_();
+};
+
+var
 init_ui =
 {
 	init_arc.value();
@@ -800,25 +800,26 @@ redraw =
 	};
 
 	var
+	redraw_enc_widget =
+	{ |x, y, label, value|
+		~screen.move_(x, y);
+		~screen.level_(lo_level);
+		~screen.text_(label);
+		~screen.move_(x, y+12);
+		~screen.level_(hi_level);
+		~screen.text_(value);
+	};
+
+	var
 	redraw_enc2_widget =
 	{
-		~screen.move_(enc2_x, enc2_y);
-		~screen.level_(lo_level);
-		~screen.text_("FREQ");
-		~screen.move_(enc2_x, enc2_y+12);
-		~screen.level_(hi_level);
-		~screen.text_(adaptive_freq_raw.value(~params.get_("filter_frequency")));
+		redraw_enc_widget.value(enc2_x, enc2_y, "FREQ", adaptive_freq_raw.value(~params.get_("filter_frequency")));
 	};
 
 	var
 	redraw_enc3_widget =
 	{
-		~screen.move_(enc3_x, enc3_y);
-		~screen.level_(lo_level);
-		~screen.text_("RES");
-		~screen.move_(enc3_x, enc3_y+12);
-		~screen.level_(hi_level);
-		~screen.text_((~params.string_("filter_resonance")));
+		redraw_enc_widget.value(enc3_x, enc3_y, "RES", ~params.get_("filter_resonance").asString++"%");
 	};
 
 	var

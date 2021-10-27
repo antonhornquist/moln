@@ -726,30 +726,12 @@ function()
   local
   redraw_enc2_widget =
   function()
-    --[[
-    screen.move(enc2_x, enc2_y)
-    screen.level(lo_level)
-    screen.text("FREQ")
-    screen.move(enc2_x, enc2_y+12)
-    screen.level(hi_level)
-    screen.text(adaptive_freq_raw(params:get("filter_frequency")))
-    ]]
     redraw_enc_widget(enc2_x, enc2_y, "FREQ", adaptive_freq_raw(params:get("filter_frequency")))
   end
 
   local
   redraw_enc3_widget =
   function()
-    --[[
-    screen.move(enc3_x, enc3_y)
-    screen.level(lo_level)
-    screen.text("RES")
-    screen.move(enc3_x, enc3_y+12)
-    screen.level(hi_level)
-    
-    screen.text(util.round(params:get("filter_resonance")*100, 1))
-    screen.text("%")
-    ]]
     redraw_enc_widget(enc3_x, enc3_y, "FREQ", tostring(util.round(params:get("filter_resonance")*100, 1)) .. "%")
   end
     
