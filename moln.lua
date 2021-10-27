@@ -485,28 +485,6 @@ function(note, grid_width)
 end
 
 local
-init_engine_init_delay_metro =
-function()
-  local engine_init_delay_metro = metro.init()
-  engine_init_delay_metro.event = function()
-    engine_ready = true
-    ui_dirty = true
-    engine_init_delay_metro:stop()
-  end
-  engine_init_delay_metro.time = 1
-  engine_init_delay_metro:start()
-end
-
-local
-init_ui_refresh_metro =
-function()
-  local ui_refresh_metro = metro.init()
-  ui_refresh_metro.event = refresh_ui
-  ui_refresh_metro.time = 1/refresh_rate
-  ui_refresh_metro:start()
-end
-
-local
 flash_event =
 function()
   event_flash_frame_counter = event_flash_duration * refresh_rate
@@ -650,6 +628,28 @@ function()
   init_engine_init_delay_metro()
 end
 
+local
+init_engine_init_delay_metro =
+function()
+  local engine_init_delay_metro = metro.init()
+  engine_init_delay_metro.event = function()
+    engine_ready = true
+    ui_dirty = true
+    engine_init_delay_metro:stop()
+  end
+  engine_init_delay_metro.time = 1
+  engine_init_delay_metro:start()
+end
+
+local
+init_ui_refresh_metro =
+function()
+  local ui_refresh_metro = metro.init()
+  ui_refresh_metro.event = refresh_ui
+  ui_refresh_metro.time = 1/refresh_rate
+  ui_refresh_metro:start()
+end
+
 engine.name = 'R'
 
 init =
@@ -782,6 +782,7 @@ function()
     end
   end
 
+  print("redraw!")
   screen.font_size(16)
   screen.clear()
 
