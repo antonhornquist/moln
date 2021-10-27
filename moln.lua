@@ -750,7 +750,7 @@ function()
     screen.text(util.round(params:get("filter_resonance")*100, 1))
     screen.text("%")
     ]]
-    redraw_enc_widget(enc3_x, enc3_y, "FREQ", params:string("filter_resonance"))
+    redraw_enc_widget(enc3_x, enc3_y, "FREQ", tostring(util.round(params:get("filter_resonance")*100, 1)) .. "%")
   end
     
   local
