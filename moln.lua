@@ -225,6 +225,36 @@ function()
 end
 
 local
+adaptive_freq_raw =
+function(hz)
+  if hz <= -1000 then
+    return util.round(hz/1000, 0.1) .. "kHz"
+  elseif hz <= -100 then
+    return util.round(hz, 1).."Hz"
+  elseif hz <= -10 then
+    return util.round(hz, 0.1).."Hz"
+  elseif hz <= -1 then
+    return util.round(hz, 0.01).."Hz"
+  elseif hz < 0 then
+    local str = tostring(util.round(hz, 0.001))
+    return "-"..string.sub(str, 3, #str).."Hz"
+  elseif hz < 1 then
+    local str = tostring(util.round(hz, 0.001))
+    return string.sub(str, 2, #str).."Hz"
+  elseif hz < 10 then
+    return util.round(hz, 0.01).."Hz"
+  elseif hz < 100 then
+    return util.round(hz, 0.1).."Hz"
+  elseif hz < 1000 then
+    return util.round(hz, 1).."Hz"
+  elseif hz < 10000 then
+    return util.round(hz/1000, 0.1) .. "kHz"
+  else
+    return util.round(hz/1000, 1) .. "kHz"
+  end
+end
+
+local
 init_filter_frequency_param =
 function()
   local spec = r_specs.MMFilter.Frequency:copy()
@@ -351,14 +381,14 @@ function()
 end
 
 local
-init_main_output_level_param =
+init_main_level_param =
 function()
   local spec = r_specs.SGain.Gain:copy()
   spec.default = -10
 
   params:add {
     type="control",
-    id="main_output_level",
+    id="main_level",
     name="Output Level",
     controlspec=spec,
     formatter=Formatters.round(0.1),
@@ -386,7 +416,7 @@ function()
   init_env_decay_param()
   init_env_sustain_param()
   init_env_release_param()
-  init_main_output_level_param()
+  init_main_level_param()
 end
 
 local
@@ -671,7 +701,7 @@ function()
     screen.text("LEVEL")
     screen.move(enc1_x+45, enc1_y)
     screen.level(hi_level)
-    screen.text(util.round(params:get_raw("main_output_level")*100, 1))
+    screen.text(util.round(params:get_raw("main_level")*100, 1))
   end
 
   local
@@ -683,29 +713,34 @@ function()
   end
 
   local
+  redraw_enc_widget =
+  function(x, y, label, value)
+    screen.move(x, y)
+    screen.level(lo_level)
+    screen.text(label)
+    screen.move(x, y+12)
+    screen.level(hi_level)
+    screen.text(value)
+  end
+
+  local
   redraw_enc2_widget =
   function()
+    --[[
     screen.move(enc2_x, enc2_y)
     screen.level(lo_level)
     screen.text("FREQ")
     screen.move(enc2_x, enc2_y+12)
     screen.level(hi_level)
-    
-    local freq_str
-    local freq = params:get("filter_frequency")
-    if util.round(freq, 1) >= 10000 then
-      freq_str = util.round(freq/1000, 1) .. "kHz"
-    elseif util.round(freq, 1) >= 1000 then
-      freq_str = util.round(freq/1000, 0.1) .. "kHz"
-    else
-      freq_str = util.round(freq, 1) .. "Hz"
-    end
-    screen.text(freq_str)
+    screen.text(adaptive_freq_raw(params:get("filter_frequency")))
+    ]]
+    redraw_enc_widget(enc2_x, enc2_y, "FREQ", adaptive_freq_raw(params:get("filter_frequency")))
   end
 
   local
   redraw_enc3_widget =
   function()
+    --[[
     screen.move(enc3_x, enc3_y)
     screen.level(lo_level)
     screen.text("RES")
@@ -714,6 +749,8 @@ function()
     
     screen.text(util.round(params:get("filter_resonance")*100, 1))
     screen.text("%")
+    ]]
+    redraw_enc_widget(enc3_x, enc3_y, "FREQ", params:string("filter_resonance"))
   end
     
   local
@@ -771,7 +808,7 @@ function(n, delta)
     delta_scaled = delta
   end
   if n == 1 then
-    params:delta("main_output_level", delta_scaled)
+    params:delta("main_level", delta_scaled)
   elseif n == 2 then
     params:delta("filter_frequency", delta_scaled)
   elseif n == 3 then

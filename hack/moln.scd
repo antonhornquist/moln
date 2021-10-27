@@ -248,6 +248,47 @@ init_lfo_to_osc_pwm_param =
 };
 
 var
+adaptive_freq_raw =
+{ |hz|
+	case
+	{ hz <= -1000 } {
+		round(hz/1000, 0.1).asString++"kHz";
+	}
+	{ hz <= -100 } {
+		round(hz, 1).asString++"Hz";
+	}
+	{ hz <= -10 } {
+		round(hz, 0.1).asString++"Hz";
+	}
+	{ hz <= -1 } {
+		round(hz, 0.01).asString++"Hz";
+	}
+	{ hz < 0 } {
+		var str = round(hz, 0.001).asString;
+		"-"++str[2..str.size-1]++"Hz";
+	}
+	{ hz < 1 } {
+		var str = round(hz, 0.001).asString;
+		str[1..str.size-1]++"Hz";
+	}
+	{ hz < 10 } {
+		round(hz, 0.01).asString++"Hz";
+	}
+	{ hz < 100 } {
+		round(hz, 0.1).asString++"Hz";
+	}
+	{ hz < 1000 } {
+		round(hz, 1).asString++"Hz";
+	}
+	{ hz < 10000 } {
+		round(hz/1000, 0.1).asString++"kHz";
+	}
+	{ true } {
+		round(hz/1000, 1).asString ++ "kHz";
+	};
+};
+
+var
 init_filter_frequency_param =
 {
 	var spec = r_specs[\LPFilter][\Frequency].copy();
@@ -260,7 +301,6 @@ init_filter_frequency_param =
 		id: "filter_frequency",
 		name: "Filter Frequency",
 		controlspec: spec,
-		formatter: formatters[\adaptive_freq],
 		action: { |value|
 			~engine.macroset_("filter_frequency", value);
 			ui_dirty = true;
@@ -316,7 +356,6 @@ init_env_attack_param =
 		id: "env_attack",
 		name: "Env Attack",
 		controlspec: spec,
-		formatter: formatters[\adaptive_time],
 		action: { |value|
 			~engine.macroset_("env_attack", value);
 		}
@@ -334,7 +373,6 @@ init_env_decay_param =
 		id: "env_decay",
 		name: "Env Decay",
 		controlspec: spec,
-		formatter: formatters[\adaptive_time],
 		action: { |value|
 			~engine.macroset_("env_decay", value);
 		}
@@ -370,7 +408,6 @@ init_env_release_param =
 		id: "env_release",
 		name: "Env Release",
 		controlspec: spec,
-		formatter: formatters[\adaptive_time],
 		action: { |value|
 			~engine.macroset_("env_release", value);
 		}
@@ -765,45 +802,6 @@ redraw =
 	var
 	redraw_enc2_widget =
 	{
-		var adaptive_freq_raw = { |hz| // TODO: this is the adaptive freq formatter
-			case
-			{ hz <= -1000 } {
-				round(hz/1000, 0.1).asString++"kHz";
-			}
-			{ hz <= -100 } {
-				round(hz, 1).asString++"Hz";
-			}
-			{ hz <= -10 } {
-				round(hz, 0.1).asString++"Hz";
-			}
-			{ hz <= -1 } {
-				round(hz, 0.01).asString++"Hz";
-			}
-			{ hz < 0 } {
-				var str = round(hz, 0.001).asString;
-				"-"++str[2..str.size-1]++"Hz";
-			}
-			{ hz < 1 } {
-				var str = round(hz, 0.001).asString;
-				str[1..str.size-1]++"Hz";
-			}
-			{ hz < 10 } {
-				round(hz, 0.01).asString++"Hz";
-			}
-			{ hz < 100 } {
-				round(hz, 0.1).asString++"Hz";
-			}
-			{ hz < 1000 } {
-				round(hz, 1).asString++"Hz";
-			}
-			{ hz < 10000 } {
-				round(hz/1000, 0.1).asString++"kHz";
-			}
-			{ true } {
-				round(hz/1000, 1).asString ++ "kHz";
-			};
-		};
-
 		~screen.move_(enc2_x, enc2_y);
 		~screen.level_(lo_level);
 		~screen.text_("FREQ");
@@ -820,7 +818,7 @@ redraw =
 		~screen.text_("RES");
 		~screen.move_(enc3_x, enc3_y+12);
 		~screen.level_(hi_level);
-		~screen.text_((~params.get_("filter_resonance")*100).asInteger.asString ++ "%"); // TODO: essentially, the percentage formatter
+		~screen.text_((~params.string_("filter_resonance")));
 	};
 
 	var
