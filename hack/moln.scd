@@ -104,7 +104,7 @@ connect_modules =
 	~engine.connect_("OutputGain/Right", "SoundOut*Right");
 };
 
-var 
+var
 create_macros =
 {
 	~engine.newmacro_("osc_a_range", r_util.poly_expand_("OscA.Range", polyphony));
@@ -128,18 +128,16 @@ create_macros =
 var
 init_osc_a_range_param =
 {
-	~params.add_(
-		(
-			type: "control",
-			id: "osc_a_range",
-			name: "Osc A Range",
-			controlspec: r_specs[\PulseOsc][\Range],
-			formatter: formatters[\round].value(1),
-			action: { |value|
-				~engine.macroset_("osc_a_range", value);
-			}
-		)
-	);
+	~params.add_((
+		type: "control",
+		id: "osc_a_range",
+		name: "Osc A Range",
+		controlspec: r_specs[\PulseOsc][\Range],
+		formatter: formatters[\round].value(1),
+		action: { |value|
+			~engine.macroset_("osc_a_range", value);
+		}
+	));
 };
 
 var
@@ -148,35 +146,31 @@ init_osc_a_pulsewidth_param =
 	var spec = r_specs[\PulseOsc][\PulseWidth].copy();
 	spec.default = 0.88;
 
-	~params.add_(
-		(
-			type: "control",
-			id: "osc_a_pulsewidth",
-			name: "Osc A Pulse Width",
-			controlspec: spec,
-			formatter: formatters[\percentage],
-			action: { |value|
-				~engine.macroset_("osc_a_pulsewidth", value);
-			}
-		)
-	);
+	~params.add_((
+		type: "control",
+		id: "osc_a_pulsewidth",
+		name: "Osc A Pulse Width",
+		controlspec: spec,
+		formatter: formatters[\percentage],
+		action: { |value|
+			~engine.macroset_("osc_a_pulsewidth", value);
+		}
+	));
 };
 
 var
 init_osc_b_range_param =
 {
-	~params.add_(
-		(
-			type: "control",
-			id: "osc_b_range",
-			name: "Osc B Range",
-			controlspec: r_specs[\PulseOsc][\Range],
-			formatter: formatters[\round].value(1),
-			action: { |value|
-				~engine.macroset_("osc_b_range", value);
-			}
-		)
-	);
+	~params.add_((
+		type: "control",
+		id: "osc_b_range",
+		name: "Osc B Range",
+		controlspec: r_specs[\PulseOsc][\Range],
+		formatter: formatters[\round].value(1),
+		action: { |value|
+			~engine.macroset_("osc_b_range", value);
+		}
+	));
 };
 
 var
@@ -185,18 +179,16 @@ init_osc_b_pulsewidth_param =
 	var spec = r_specs[\PulseOsc][\PulseWidth].copy();
 	spec.default = 0.88;
 
-	~params.add_(
-		(
-			type: "control",
-			id: "osc_b_pulsewidth",
-			name: "Osc B Pulse Width",
-			controlspec: spec,
-			formatter: formatters[\percentage],
-			action: { |value|
-				~engine.macroset_("osc_b_pulsewidth", value);
-			}
-		)
-	);
+	~params.add_((
+		type: "control",
+		id: "osc_b_pulsewidth",
+		name: "Osc B Pulse Width",
+		controlspec: spec,
+		formatter: formatters[\percentage],
+		action: { |value|
+			~engine.macroset_("osc_b_pulsewidth", value);
+		}
+	));
 };
 
 var
@@ -205,19 +197,17 @@ init_osc_detune_param =
 	var spec = \unipolar.asSpec.copy();
 	spec.default = 0.36;
 
-	~params.add_(
-		(
-			type: "control",
-			id: "osc_detune",
-			name: "Detune",
-			controlspec: spec,
-			formatter: formatters[\percentage],
-			action: { |value|
-				~engine.macroset_("osc_a_detune", -1 * value * 20);
-				~engine.macroset_("osc_b_detune", value * 20);
-			}
-		)
-	);
+	~params.add_((
+		type: "control",
+		id: "osc_detune",
+		name: "Detune",
+		controlspec: spec,
+		formatter: formatters[\percentage],
+		action: { |value|
+			~engine.macroset_("osc_a_detune", -1 * value * 20);
+			~engine.macroset_("osc_b_detune", value * 20);
+		}
+	));
 };
 
 var
@@ -226,18 +216,16 @@ init_lfo_frequency_param =
 	var spec = r_specs[\MultiLFO][\Frequency].copy();
 	spec.default = 0.125;
 
-	~params.add_(
-		(
-			type: "control",
-			id: "lfo_frequency",
-			name: "PWM Rate",
-			controlspec: spec,
-			formatter: formatters[\round].value(0.001),
-			action: { |value|
-				~engine.macroset_("lfo_frequency", value);
-			}
-		)
-	);
+	~params.add_((
+		type: "control",
+		id: "lfo_frequency",
+		name: "PWM Rate",
+		controlspec: spec,
+		formatter: formatters[\round].value(0.001),
+		action: { |value|
+			~engine.macroset_("lfo_frequency", value);
+		}
+	));
 };
 
 var
@@ -246,19 +234,17 @@ init_lfo_to_osc_pwm_param =
 	var spec = \unipolar.asSpec.copy();
 	spec.default = 0.46;
 
-	~params.add_(
-		(
-			type: "control",
-			id: "lfo_to_osc_pwm",
-			name: "PWM Depth",
-			controlspec: spec,
-			formatter: formatters[\percentage],
-			action: { |value|
-				~engine.macroset_("osc_a_pwm", value*0.76);
-				~engine.macroset_("osc_b_pwm", value*0.56);
-			}
-		)
-	);
+	~params.add_((
+		type: "control",
+		id: "lfo_to_osc_pwm",
+		name: "PWM Depth",
+		controlspec: spec,
+		formatter: formatters[\percentage],
+		action: { |value|
+			~engine.macroset_("osc_a_pwm", value*0.76);
+			~engine.macroset_("osc_b_pwm", value*0.56);
+		}
+	));
 };
 
 var
@@ -269,18 +255,17 @@ init_filter_frequency_param =
 	spec.minval = 10;
 	spec.default = 500;
 
-	~params.add_(
-		(
-			type: "control",
-			id: "filter_frequency",
-			name: "Filter Frequency",
-			controlspec: spec,
-			formatter: formatters[\adaptive_freq],
-			action: { |value|
-				~engine.macroset_("filter_frequency", value);
-			}
-		)
-	);
+	~params.add_((
+		type: "control",
+		id: "filter_frequency",
+		name: "Filter Frequency",
+		controlspec: spec,
+		formatter: formatters[\adaptive_freq],
+		action: { |value|
+			~engine.macroset_("filter_frequency", value);
+			ui_dirty = true;
+		}
+	));
 };
 
 var
@@ -289,18 +274,17 @@ init_filter_resonance_param =
 	var spec = r_specs[\LPFilter][\Resonance].copy();
 	spec.default = 0.2;
 
-	~params.add_(
-		(
-			type: "control",
-			id: "filter_resonance",
-			name: "Filter Resonance",
-			controlspec: spec,
-			formatter: formatters[\percentage],
-			action: { |value|
-				~engine.macroset_("filter_resonance", value);
-			}
-		)
-	);
+	~params.add_((
+		type: "control",
+		id: "filter_resonance",
+		name: "Filter Resonance",
+		controlspec: spec,
+		formatter: formatters[\percentage],
+		action: { |value|
+			~engine.macroset_("filter_resonance", value);
+			ui_dirty = true;
+		}
+	));
 };
 
 var
@@ -309,18 +293,16 @@ init_env_to_filter_fm_param =
 	var spec = r_specs[\LPFilter][\FM].copy();
 	spec.default = 0.35;
 
-	~params.add_(
-		(
-			type: "control",
-			id: "env_to_filter_fm",
-			name: "Env > Filter Frequency",
-			controlspec: spec,
-			formatter: formatters[\percentage],
-			action: { |value|
-				~engine.macroset_("env_to_filter_fm", value);
-			}
-		)
-	);
+	~params.add_((
+		type: "control",
+		id: "env_to_filter_fm",
+		name: "Env > Filter Frequency",
+		controlspec: spec,
+		formatter: formatters[\percentage],
+		action: { |value|
+			~engine.macroset_("env_to_filter_fm", value);
+		}
+	));
 };
 
 var
@@ -329,18 +311,16 @@ init_env_attack_param =
 	var spec = r_specs[\ADSREnv][\Attack].copy();
 	spec.default = 1;
 
-	~params.add_(
-		(
-			type: "control",
-			id: "env_attack",
-			name: "Env Attack",
-			controlspec: spec,
-			formatter: formatters[\adaptive_time],
-			action: { |value|
-				~engine.macroset_("env_attack", value);
-			}
-		)
-	);
+	~params.add_((
+		type: "control",
+		id: "env_attack",
+		name: "Env Attack",
+		controlspec: spec,
+		formatter: formatters[\adaptive_time],
+		action: { |value|
+			~engine.macroset_("env_attack", value);
+		}
+	));
 };
 
 var
@@ -349,18 +329,16 @@ init_env_decay_param =
 	var spec = r_specs[\ADSREnv][\Decay].copy();
 	spec.default = 200;
 
-	~params.add_(
-		(
-			type: "control",
-			id: "env_decay",
-			name: "Env Decay",
-			controlspec: spec,
-			formatter: formatters[\adaptive_time],
-			action: { |value|
-				~engine.macroset_("env_decay", value);
-			}
-		)
-	);
+	~params.add_((
+		type: "control",
+		id: "env_decay",
+		name: "Env Decay",
+		controlspec: spec,
+		formatter: formatters[\adaptive_time],
+		action: { |value|
+			~engine.macroset_("env_decay", value);
+		}
+	));
 };
 
 var
@@ -369,18 +347,16 @@ init_env_sustain_param =
 	var spec = r_specs[\ADSREnv][\Sustain].copy();
 	spec.default = 0.5;
 
-	~params.add_(
-		(
-			type: "control",
-			id: "env_sustain",
-			name: "Env Sustain",
-			controlspec: spec,
-			formatter: formatters[\percentage],
-			action: { |value|
-				~engine.macroset_("env_sustain", value);
-			}
-		)
-	);
+	~params.add_((
+		type: "control",
+		id: "env_sustain",
+		name: "Env Sustain",
+		controlspec: spec,
+		formatter: formatters[\percentage],
+		action: { |value|
+			~engine.macroset_("env_sustain", value);
+		}
+	));
 };
 
 var
@@ -389,18 +365,16 @@ init_env_release_param =
 	var spec = r_specs[\ADSREnv][\Release].copy();
 	spec.default = 500;
 
-	~params.add_(
-		(
-			type: "control",
-			id: "env_release",
-			name: "Env Release",
-			controlspec: spec,
-			formatter: formatters[\adaptive_time],
-			action: { |value|
-				~engine.macroset_("env_release", value);
-			}
-		)
-	);
+	~params.add_((
+		type: "control",
+		id: "env_release",
+		name: "Env Release",
+		controlspec: spec,
+		formatter: formatters[\adaptive_time],
+		action: { |value|
+			~engine.macroset_("env_release", value);
+		}
+	));
 };
 
 var
@@ -409,18 +383,17 @@ init_main_level_param =
 	var spec = r_specs['SGain']['Gain'].copy;
 	spec.default = -10;
 
-	~params.add_(
-		(
-			type: "control",
-			id: "main_level",
-			name: "Output Level",
-			controlspec: spec,
-			formatter: formatters.round_(0.1),
-			action: { |value|
-				~engine.set_("OutputGain.Gain", value);
-			}
-		)
-	);
+	~params.add_((
+		type: "control",
+		id: "main_level",
+		name: "Output Level",
+		controlspec: spec,
+		formatter: formatters.round_(0.1),
+		action: { |value|
+			~engine.set_("OutputGain.Gain", value);
+			ui_dirty = true;
+		}
+	));
 };
 
 var
@@ -507,9 +480,7 @@ init_engine_init_delay_metro =
 	var engine_init_delay_metro = ~metro.init_();
 	engine_init_delay_metro[\event] = {
 		engine_ready = true;
-
 		ui_dirty = true;
-
 		engine_init_delay_metro.stop_();
 	};
 	engine_init_delay_metro.time = 1;
@@ -611,7 +582,6 @@ init_arc =
 		} {
 			delta_scaled = delta;
 		};
-
 		case
 		{n == 1} {
 			var val = ~params.get_raw_("filter_frequency");
@@ -904,10 +874,8 @@ enc =
 	} {
 		delta_scaled = delta;
 	};
-	case
-	{ n == 1 } {
+	case { n == 1 } {
 		~params.delta_("main_level", delta_scaled);
-		ui_dirty = true;
 	}
 	{ n == 2 } {
 		~params.delta_("filter_frequency", delta_scaled);
@@ -927,7 +895,6 @@ key =
 		} {
 			fine = false;
 		};
-		ui_dirty = true;
 	}
 	{ n == 3 } {
 		if (engine_ready) {
@@ -935,16 +902,15 @@ key =
 				lastkeynote = 60.rand + 20;
 				note_on.value(lastkeynote, 100);
 				trigging = true;
-				ui_dirty = true;
 			} {
 				if (lastkeynote.notNil) {
 					note_off.value(lastkeynote, 100);
 					trigging = false;
-					ui_dirty = true;
 				};
 			};
 		}
 	};
+	ui_dirty = true;
 };
 };
 )

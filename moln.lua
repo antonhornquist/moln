@@ -364,6 +364,7 @@ function()
     formatter=Formatters.round(0.1),
     action=function (value)
       engine.set("OutputGain.Gain", value)
+      ui_dirty = true;
     end
   }
 end
@@ -420,7 +421,6 @@ function(note, velocity)
     end
     note_slots[note] = slot
     note_downs[voicenum] = note
-    ui_dirty = true
   end
 end
 
@@ -431,7 +431,6 @@ function(note)
   if slot then
     voice_allocator:release(slot)
     note_downs[slot.id] = nil
-    ui_dirty = true
   end
 end
 
@@ -534,7 +533,9 @@ function()
   grid_device:refresh()
 end
 
-function refresh_ui()
+local
+refresh_ui =
+function()
   update_event_indicator()
   update_grid_width()
 
@@ -771,7 +772,6 @@ function(n, delta)
   end
   if n == 1 then
     params:delta("main_output_level", delta_scaled)
-    ui_dirty = true
   elseif n == 2 then
     params:delta("filter_frequency", delta_scaled)
   elseif n == 3 then
@@ -787,21 +787,19 @@ function(n, z)
     else
       fine = false
     end
-    ui_dirty = true
   elseif n == 3 then
     if engine_ready then
       if z == 1 then
         lastkeynote = math.random(60) + 20
         note_on(lastkeynote, 100)
         trigging = true
-        ui_dirty = true
       else
         if lastkeynote then
           note_off(lastkeynote)
           trigging = false
-          ui_dirty = true
         end
       end
     end
   end
+  ui_dirty = true
 end
