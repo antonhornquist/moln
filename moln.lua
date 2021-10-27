@@ -394,7 +394,7 @@ function()
     formatter=Formatters.round(0.1),
     action=function (value)
       engine.set("OutputGain.Gain", value)
-      ui_dirty = true;
+      ui_dirty = true
     end
   }
 end
