@@ -619,16 +619,6 @@ function()
 end
 
 local
-init_ui =
-function()
-  init_arc()
-  init_grid()
-  init_midi()
-  init_ui_refresh_metro()
-  init_engine_init_delay_metro()
-end
-
-local
 init_engine_init_delay_metro =
 function()
   local engine_init_delay_metro = metro.init()
@@ -648,6 +638,16 @@ function()
   ui_refresh_metro.event = refresh_ui
   ui_refresh_metro.time = 1/refresh_rate
   ui_refresh_metro:start()
+end
+
+local
+init_ui =
+function()
+  init_arc()
+  init_grid()
+  init_midi()
+  init_ui_refresh_metro()
+  init_engine_init_delay_metro()
 end
 
 engine.name = 'R'
@@ -782,7 +782,6 @@ function()
     end
   end
 
-  print("redraw!")
   screen.font_size(16)
   screen.clear()
 
