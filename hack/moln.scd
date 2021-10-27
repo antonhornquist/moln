@@ -644,57 +644,6 @@ init_midi =
 			{msg['type'] == 'note_on'} {
 				note_on.value(msg.note, msg.vel / 127);
 			};
-/*
-TODO
-			{msg['type'] == 'cc'} {
-				var num = msg['num'];
-				var val = msg['val'];
-				var rel_cc_delta = if (val > 64, val-128, val);
-				[num, val].debug;
-				case
-				{num == 1} {
-					~params.delta_( "lfo_frequency", rel_cc_delta);
-				}
-				{num == 2} {
-					//~params.delta_( "lfo_to_osc_pwm", rel_cc_delta);
-					~params.delta_( "osc_detune", rel_cc_delta);
-				}
-				{num == 3} {
-					~params.delta_( "filter_frequency", rel_cc_delta);
-				}
-				{num == 4} {
-					~params.delta_( "env_release", rel_cc_delta);
-				}
-				{num == 11} {
-					case
-					{val == 127} {
-						~key.value(2, 1);
-					}
-					{val == 0} {
-						~key.value(2, 0);
-					};
-				}
-				{num == 12} {
-					case
-					{val == 127} {
-						~key.value(3, 1);
-					}
-					{val == 0} {
-						~key.value(3, 0);
-					};
-				}
-				{num == 14} {
-					case
-					{val == 127} {
-						~key.value(1, 1);
-					}
-					{val == 0} {
-						~key.value(1, 0);
-					};
-				}
-				;
-			};
-*/
 			ui_dirty = true;
 		};
 	};
