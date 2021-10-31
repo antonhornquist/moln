@@ -758,7 +758,8 @@ redraw_key2_widget =
 };
 
 var
-redraw_key3_widget = {
+redraw_key3_widget =
+{
 	~screen.move_(key3_x, key3_y);
 	if (engine_ready) {
 		if (trigging) {
@@ -864,5 +865,6 @@ key =
 	};
 	ui_dirty = true;
 };
+
 };
 )

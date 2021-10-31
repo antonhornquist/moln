@@ -54,6 +54,7 @@ local lastkeynote
 local polyphony = 5
 local note_downs = {}
 local note_slots = {}
+local voice_allocator
 
 local
 create_modules =
