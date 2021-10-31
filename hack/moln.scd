@@ -32,11 +32,41 @@ var formatters = include_relative.value(lib_root_relative +/+ "formatters.scd");
 var voice = include_relative.value(lib_root_relative +/+ "voice.scd");
 var voice_new = voice[\voice_new];
 
+var grid_width;
+var grid_device;
+var arc_device;
+
+var ui_dirty = false;
+
+var refresh_rate = 60;
+
+var event_flash_duration = 0.15;
+var show_event_indicator = false;
+var event_flash_frame_counter = nil;
+
 var grid_led_x_spec = ControlSpec(1, 16, 'linear', 1, 0, "");
 var grid_led_y_spec = ControlSpec(1, 16, 'linear', 1, 0, "");
 var grid_led_l_spec = ControlSpec(0, 15, 'linear', 1, 0, "");
 var arc_led_x_spec = ControlSpec(1, 64, 'linear', 1, 0, "");
 var arc_led_l_spec = ControlSpec(0, 15, 'linear', 1, 0, "");
+
+var hi_level = 15;
+var lo_level = 4;
+
+var enc1_x = 1;
+var enc1_y = 12;
+
+var enc2_x = 10;
+var enc2_y = 32;
+
+var enc3_x = enc2_x + 65;
+var enc3_y = enc2_y;
+
+var key2_x = 1;
+var key2_y = 63;
+
+var key3_x = key2_x+65;
+var key3_y = key2_y;
 
 var engine_ready = false;
 var trigging = false;
@@ -46,16 +76,6 @@ var lastkeynote;
 var polyphony = 5;
 var note_downs = ();
 var note_slots = ();
-
-var grid_width;
-
-var ui_dirty = false;
-
-var refresh_rate = 60;
-
-var event_flash_duration = 0.15;
-var show_event_indicator = false;
-var event_flash_frame_counter = nil;
 
 var 
 create_modules =
@@ -538,9 +558,9 @@ update_event_indicator =
 var
 update_grid_width =
 {
-	if (~grid_device.device_.notNil) {
-		if (grid_width != ~grid_device.cols_) {
-			grid_width = ~grid_device.cols_;
+	if (grid_device.device_.notNil) {
+		if (grid_width != grid_device.cols_) {
+			grid_width = grid_device.cols_;
 		};
 	};
 };
@@ -548,25 +568,25 @@ update_grid_width =
 var
 refresh_arc =
 {
-	~arc_device.all_(0);
-	~arc_device.led_(1, arc_led_x_spec.map(~params.get_raw_("filter_frequency")), arc_led_l_spec.maxval);
-	~arc_device.led_(2, arc_led_x_spec.map(~params.get_raw_("filter_resonance")), arc_led_l_spec.maxval);
-	~arc_device.refresh_();
+	arc_device.all_(0);
+	arc_device.led_(1, arc_led_x_spec.map(~params.get_raw_("filter_frequency")), arc_led_l_spec.maxval);
+	arc_device.led_(2, arc_led_x_spec.map(~params.get_raw_("filter_resonance")), arc_led_l_spec.maxval);
+	arc_device.refresh_();
 };
 
 var
 refresh_grid =
 {
-	~grid_device.all_(0);
+	grid_device.all_(0);
 	polyphony.do { |voicenum|
 		var note = note_downs[voicenum];
 		if (note.notNil) {
 			var x, y;
 			# x, y = note_to_gridkey.value(note, grid_width);
-			~grid_device.led_(grid_led_x_spec.constrain(x), grid_led_y_spec.constrain(x), grid_led_l_spec.maxval);
+			grid_device.led_(grid_led_x_spec.constrain(x), grid_led_y_spec.constrain(x), grid_led_l_spec.maxval);
 		}
 	};
-	~grid_device.refresh_();
+	grid_device.refresh_();
 };
 
 var
@@ -586,8 +606,8 @@ refresh_ui =
 var
 init_arc =
 {
-	~arc_device = ~arc.connect_();
-	~arc_device[\delta] = { |n, delta| // not .delta notation to suppress self argument?
+	arc_device = ~arc.connect_();
+	arc_device[\delta] = { |n, delta|
 		var delta_scaled;
 
 		flash_event.value();
@@ -614,8 +634,8 @@ init_arc =
 var
 init_grid =
 {
-	~grid_device = ~grid.connect_();
-	~grid_device[\key] = { |x, y, state|
+	grid_device = ~grid.connect_();
+	grid_device[\key] = { |x, y, state|
 		flash_event.value();
 		if (engine_ready) {
 			var note = gridkey_to_note.value(x, y, grid_width);
@@ -711,91 +731,6 @@ cleanup =
 ~
 redraw =
 {
-	var hi_level = 15;
-	var lo_level = 4;
-
-	var enc1_x = 1;
-	var enc1_y = 12;
-
-	var enc2_x = 10;
-	var enc2_y = 32;
-
-	var enc3_x = enc2_x + 65;
-	var enc3_y = enc2_y;
-
-	var key2_x = 1;
-	var key2_y = 63;
-
-	var key3_x = key2_x+65;
-	var key3_y = key2_y;
-
-	var
-	redraw_enc1_widget =
-	{
-		~screen.move_(enc1_x, enc1_y);
-		~screen.level_(lo_level);
-		~screen.text_("LEVEL");
-		~screen.move_(enc1_x+45, enc1_y);
-		~screen.level_(hi_level);
-		~screen.text_(round(~params.get_raw_("main_level")*100).asInteger.asString);
-	};
-
-	var
-	redraw_event_flash_widget =
-	{
-		~screen.level_(lo_level);
-		~screen.rect_(122, enc1_y-7, 5, 5);
-		~screen.fill_();
-	};
-
-	var
-	redraw_enc_widget =
-	{ |x, y, label, value|
-		~screen.move_(x, y);
-		~screen.level_(lo_level);
-		~screen.text_(label);
-		~screen.move_(x, y+12);
-		~screen.level_(hi_level);
-		~screen.text_(value);
-	};
-
-	var
-	redraw_enc2_widget =
-	{
-		redraw_enc_widget.value(enc2_x, enc2_y, "FREQ", adaptive_freq_raw.value(~params.get_("filter_frequency")));
-	};
-
-	var
-	redraw_enc3_widget =
-	{
-		redraw_enc_widget.value(enc3_x, enc3_y, "RES", ~params.get_("filter_resonance").asString++"%");
-	};
-
-	var
-	redraw_key2_widget =
-	{
-		~screen.move_(key2_x, key2_y);
-		if (fine) {
-			~screen.level_(hi_level);
-			~screen.text_("FINE");
-		} {
-			~screen.level_(lo_level);
-			~screen.text_("COARSE");
-		};
-	};
-
-	var redraw_key3_widget = {
-		~screen.move_(key3_x, key3_y);
-		if (engine_ready) {
-			if (trigging) {
-				~screen.level_(hi_level);
-			} {
-				~screen.level_(lo_level);
-			};
-			~screen.text_("TRIG");
-		};
-	};
-
 	~screen.font_size_(16);
 	~screen.clear_();
 
@@ -811,6 +746,74 @@ redraw =
 	redraw_key3_widget.value();
 
 	~screen.update_();
+};
+
+~
+redraw_enc1_widget =
+{
+	~screen.move_(enc1_x, enc1_y);
+	~screen.level_(lo_level);
+	~screen.text_("LEVEL");
+	~screen.move_(enc1_x+45, enc1_y);
+	~screen.level_(hi_level);
+	~screen.text_(round(~params.get_raw_("main_level")*100).asInteger.asString);
+};
+
+~
+redraw_event_flash_widget =
+{
+	~screen.level_(lo_level);
+	~screen.rect_(122, enc1_y-7, 5, 5);
+	~screen.fill_();
+};
+
+~
+redraw_param_widget =
+{ |x, y, label, value|
+	~screen.move_(x, y);
+	~screen.level_(lo_level);
+	~screen.text_(label);
+	~screen.move_(x, y+12);
+	~screen.level_(hi_level);
+	~screen.text_(value);
+};
+
+~
+redraw_enc2_widget =
+{
+	redraw_param_widget.value(enc2_x, enc2_y, "FREQ", adaptive_freq_raw.value(~params.get_("filter_frequency")));
+};
+
+~
+redraw_enc3_widget =
+{
+	redraw_param_widget.value(enc3_x, enc3_y, "RES", ~params.get_("filter_resonance").asString++"%");
+};
+
+~
+redraw_key2_widget =
+{
+	~screen.move_(key2_x, key2_y);
+	if (fine) {
+		~screen.level_(hi_level);
+		~screen.text_("FINE");
+	} {
+		~screen.level_(lo_level);
+		~screen.text_("COARSE");
+	};
+};
+
+~
+redraw_key3_widget = {
+	~screen.move_(key3_x, key3_y);
+	if (engine_ready) {
+		if (trigging) {
+			~screen.level_(hi_level);
+		} {
+			~screen.level_(lo_level);
+		};
+		~screen.text_("TRIG");
+	};
 };
 
 ~

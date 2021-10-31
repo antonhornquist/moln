@@ -10,22 +10,9 @@ local ControlSpec = require 'controlspec'
 local Formatters = require 'formatters'
 local Voice = require 'voice'
 
-local grid_led_x_spec = ControlSpec.new(1, 16, ControlSpec.WARP_LIN, 1, 0, "")
-local grid_led_y_spec = ControlSpec.new(1, 16, ControlSpec.WARP_LIN, 1, 0, "")
-local grid_led_l_spec = ControlSpec.new(0, 15, ControlSpec.WARP_LIN, 1, 0, "")
-local arc_led_x_spec = ControlSpec.new(1, 64, ControlSpec.WARP_LIN, 1, 0, "")
-local arc_led_l_spec = ControlSpec.new(0, 15, ControlSpec.WARP_LIN, 1, 0, "")
-
-local engine_ready = false
-local trigging = false
-local fine = false
-local lastkeynote
-
-local POLYPHONY = 5
-local note_downs = {}
-local note_slots = {}
-
 local grid_width
+local grid_device
+local arc_device
 
 local ui_dirty = false
 
@@ -35,16 +22,49 @@ local event_flash_duration = 0.15
 local show_event_indicator = false
 local event_flash_frame_counter = nil
 
+local grid_led_x_spec = ControlSpec.new(1, 16, ControlSpec.WARP_LIN, 1, 0, "")
+local grid_led_y_spec = ControlSpec.new(1, 16, ControlSpec.WARP_LIN, 1, 0, "")
+local grid_led_l_spec = ControlSpec.new(0, 15, ControlSpec.WARP_LIN, 1, 0, "")
+local arc_led_x_spec = ControlSpec.new(1, 64, ControlSpec.WARP_LIN, 1, 0, "")
+local arc_led_l_spec = ControlSpec.new(0, 15, ControlSpec.WARP_LIN, 1, 0, "")
+
+local hi_level = 15
+local lo_level = 4
+
+local enc1_x = 1
+local enc1_y = 12
+
+local enc2_x = 10
+local enc2_y = 32
+
+local enc3_x = enc2_x+65
+local enc3_y = enc2_y
+
+local key2_x = 1
+local key2_y = 63
+
+local key3_x = key2_x+65
+local key3_y = key2_y
+
+local engine_ready = false
+local trigging = false
+local fine = false
+local lastkeynote
+
+local polyphony = 5
+local note_downs = {}
+local note_slots = {}
+
 local
 create_modules =
 function()
-  r_engine.poly_new("FreqGate", "FreqGate", POLYPHONY)
-  r_engine.poly_new("LFO", "SineLFO", POLYPHONY)
-  r_engine.poly_new("Env", "ADSREnv", POLYPHONY)
-  r_engine.poly_new("OscA", "PulseOsc", POLYPHONY)
-  r_engine.poly_new("OscB", "PulseOsc", POLYPHONY)
-  r_engine.poly_new("Filter", "LPFilter", POLYPHONY)
-  r_engine.poly_new("Amp", "Amp", POLYPHONY)
+  r_engine.poly_new("FreqGate", "FreqGate", polyphony)
+  r_engine.poly_new("LFO", "SineLFO", polyphony)
+  r_engine.poly_new("Env", "ADSREnv", polyphony)
+  r_engine.poly_new("OscA", "PulseOsc", polyphony)
+  r_engine.poly_new("OscB", "PulseOsc", polyphony)
+  r_engine.poly_new("Filter", "LPFilter", polyphony)
+  r_engine.poly_new("Amp", "Amp", polyphony)
 
   engine.new("OutputGain", "SGain")
   engine.new("SoundOut", "SoundOut")
@@ -53,26 +73,26 @@ end
 local
 set_static_module_params =
 function ()
-  r_engine.poly_set("OscA.FM", 1, POLYPHONY)
-  r_engine.poly_set("OscB.FM", 1, POLYPHONY)
-  r_engine.poly_set("Filter.AudioLevel", 1, POLYPHONY)
+  r_engine.poly_set("OscA.FM", 1, polyphony)
+  r_engine.poly_set("OscB.FM", 1, polyphony)
+  r_engine.poly_set("Filter.AudioLevel", 1, polyphony)
 end
 
 local
 connect_modules =
 function()
-  r_engine.poly_connect("FreqGate/Frequency", "OscA*FM", POLYPHONY)
-  r_engine.poly_connect("FreqGate/Frequency", "OscB*FM", POLYPHONY)
-  r_engine.poly_connect("FreqGate/Gate", "Env*Gate", POLYPHONY)
-  r_engine.poly_connect("LFO/Out", "OscA*PWM", POLYPHONY)
-  r_engine.poly_connect("LFO/Out", "OscB*PWM", POLYPHONY)
-  r_engine.poly_connect("Env/Out", "Amp*Lin", POLYPHONY)
-  r_engine.poly_connect("Env/Out", "Filter*FM", POLYPHONY)
-  r_engine.poly_connect("OscA/Out", "Filter*In", POLYPHONY)
-  r_engine.poly_connect("OscB/Out", "Filter*In", POLYPHONY)
-  r_engine.poly_connect("Filter/Out", "Amp*In", POLYPHONY)
+  r_engine.poly_connect("FreqGate/Frequency", "OscA*FM", polyphony)
+  r_engine.poly_connect("FreqGate/Frequency", "OscB*FM", polyphony)
+  r_engine.poly_connect("FreqGate/Gate", "Env*Gate", polyphony)
+  r_engine.poly_connect("LFO/Out", "OscA*PWM", polyphony)
+  r_engine.poly_connect("LFO/Out", "OscB*PWM", polyphony)
+  r_engine.poly_connect("Env/Out", "Amp*Lin", polyphony)
+  r_engine.poly_connect("Env/Out", "Filter*FM", polyphony)
+  r_engine.poly_connect("OscA/Out", "Filter*In", polyphony)
+  r_engine.poly_connect("OscB/Out", "Filter*In", polyphony)
+  r_engine.poly_connect("Filter/Out", "Amp*In", polyphony)
 
-  for voicenum=1, POLYPHONY do
+  for voicenum=1, polyphony do
     engine.connect("Amp"..voicenum.."/Out", "OutputGain*Left")
     engine.connect("Amp"..voicenum.."/Out", "OutputGain*Right")
   end
@@ -84,22 +104,22 @@ end
 local
 create_macros =
 function ()
-  engine.newmacro("osc_a_range", r_util.poly_expand("OscA.Range", POLYPHONY))
-  engine.newmacro("osc_a_pulsewidth", r_util.poly_expand("OscA.PulseWidth", POLYPHONY))
-  engine.newmacro("osc_b_range", r_util.poly_expand("OscB.Range", POLYPHONY))
-  engine.newmacro("osc_b_pulsewidth", r_util.poly_expand("OscB.PulseWidth", POLYPHONY))
-  engine.newmacro("osc_a_detune", r_util.poly_expand("OscA.Tune", POLYPHONY))
-  engine.newmacro("osc_b_detune", r_util.poly_expand("OscB.Tune", POLYPHONY))
-  engine.newmacro("lfo_frequency", r_util.poly_expand("LFO.Frequency", POLYPHONY))
-  engine.newmacro("osc_a_pwm", r_util.poly_expand("OscA.PWM", POLYPHONY))
-  engine.newmacro("osc_b_pwm", r_util.poly_expand("OscB.PWM", POLYPHONY))
-  engine.newmacro("filter_frequency", r_util.poly_expand("Filter.Frequency", POLYPHONY))
-  engine.newmacro("filter_resonance", r_util.poly_expand("Filter.Resonance", POLYPHONY))
-  engine.newmacro("env_to_filter_fm", r_util.poly_expand("Filter.FM", POLYPHONY))
-  engine.newmacro("env_attack", r_util.poly_expand("Env.Attack", POLYPHONY))
-  engine.newmacro("env_decay", r_util.poly_expand("Env.Decay", POLYPHONY))
-  engine.newmacro("env_sustain", r_util.poly_expand("Env.Sustain", POLYPHONY))
-  engine.newmacro("env_release", r_util.poly_expand("Env.Release", POLYPHONY))
+  engine.newmacro("osc_a_range", r_util.poly_expand("OscA.Range", polyphony))
+  engine.newmacro("osc_a_pulsewidth", r_util.poly_expand("OscA.PulseWidth", polyphony))
+  engine.newmacro("osc_b_range", r_util.poly_expand("OscB.Range", polyphony))
+  engine.newmacro("osc_b_pulsewidth", r_util.poly_expand("OscB.PulseWidth", polyphony))
+  engine.newmacro("osc_a_detune", r_util.poly_expand("OscA.Tune", polyphony))
+  engine.newmacro("osc_b_detune", r_util.poly_expand("OscB.Tune", polyphony))
+  engine.newmacro("lfo_frequency", r_util.poly_expand("LFO.Frequency", polyphony))
+  engine.newmacro("osc_a_pwm", r_util.poly_expand("OscA.PWM", polyphony))
+  engine.newmacro("osc_b_pwm", r_util.poly_expand("OscB.PWM", polyphony))
+  engine.newmacro("filter_frequency", r_util.poly_expand("Filter.Frequency", polyphony))
+  engine.newmacro("filter_resonance", r_util.poly_expand("Filter.Resonance", polyphony))
+  engine.newmacro("env_to_filter_fm", r_util.poly_expand("Filter.FM", polyphony))
+  engine.newmacro("env_attack", r_util.poly_expand("Env.Attack", polyphony))
+  engine.newmacro("env_decay", r_util.poly_expand("Env.Decay", polyphony))
+  engine.newmacro("env_sustain", r_util.poly_expand("Env.Sustain", polyphony))
+  engine.newmacro("env_release", r_util.poly_expand("Env.Release", polyphony))
 end
 
 local
@@ -531,7 +551,7 @@ local
 refresh_grid =
 function()
   grid_device:all(0)
-  for voicenum=1,POLYPHONY do
+  for voicenum=1,polyphony do
     local note = note_downs[voicenum]
     if note then
       local x, y = note_to_gridkey(note, grid_width)
@@ -654,7 +674,7 @@ engine.name = 'R'
 
 init =
 function()
-  voice_allocator = Voice.new(POLYPHONY)
+  voice_allocator = Voice.new(polyphony)
 
   create_modules()
   set_static_module_params()
@@ -675,95 +695,6 @@ end
 
 redraw =
 function()
-  local hi_level = 15
-  local lo_level = 4
-
-  local enc1_x = 1
-  local enc1_y = 12
-
-  local enc2_x = 10
-  local enc2_y = 32
-
-  local enc3_x = enc2_x+65
-  local enc3_y = enc2_y
-
-  local key2_x = 1
-  local key2_y = 63
-
-  local key3_x = key2_x+65
-  local key3_y = key2_y
-
-  local
-  redraw_enc1_widget =
-  function()
-    screen.move(enc1_x, enc1_y)
-    screen.level(lo_level)
-    screen.text("LEVEL")
-    screen.move(enc1_x+45, enc1_y)
-    screen.level(hi_level)
-    screen.text(util.round(params:get_raw("main_level")*100, 1))
-  end
-
-  local
-  redraw_event_flash_widget =
-  function()
-    screen.level(lo_level)
-    screen.rect(122, enc1_y-7, 5, 5)
-    screen.fill()
-  end
-
-  local
-  redraw_enc_widget =
-  function(x, y, label, value)
-    screen.move(x, y)
-    screen.level(lo_level)
-    screen.text(label)
-    screen.move(x, y+12)
-    screen.level(hi_level)
-    screen.text(value)
-  end
-
-  local
-  redraw_enc2_widget =
-  function()
-    redraw_enc_widget(enc2_x, enc2_y, "FREQ", adaptive_freq_raw(params:get("filter_frequency")))
-  end
-
-  local
-  redraw_enc3_widget =
-  function()
-    redraw_enc_widget(enc3_x, enc3_y, "FREQ", tostring(util.round(params:get("filter_resonance")*100, 1)) .. "%")
-  end
-    
-  local
-  redraw_key2_widget =
-  function()
-    screen.move(key2_x, key2_y)
-    
-    if fine then
-      screen.level(hi_level)
-      screen.text("FINE")
-    else
-      screen.level(lo_level)
-      screen.text("COARSE")
-    end
-  end
-
-  local
-  redraw_key3_widget =
-  function()
-    screen.move(key3_x, key3_y)
-    
-    if engine_ready then
-      if trigging then
-        screen.level(hi_level)
-      else
-        screen.level(lo_level)
-      end
-      screen.text("TRIG")
-    end
-  end
-
   screen.font_size(16)
   screen.clear()
 
@@ -779,6 +710,70 @@ function()
   redraw_key3_widget()
 
   screen.update()
+end
+
+redraw_enc1_widget =
+function()
+  screen.move(enc1_x, enc1_y)
+  screen.level(lo_level)
+  screen.text("LEVEL")
+  screen.move(enc1_x+45, enc1_y)
+  screen.level(hi_level)
+  screen.text(util.round(params:get_raw("main_level")*100, 1))
+end
+
+redraw_event_flash_widget =
+function()
+  screen.level(lo_level)
+  screen.rect(122, enc1_y-7, 5, 5)
+  screen.fill()
+end
+
+redraw_param_widget =
+function(x, y, label, value)
+  screen.move(x, y)
+  screen.level(lo_level)
+  screen.text(label)
+  screen.move(x, y+12)
+  screen.level(hi_level)
+  screen.text(value)
+end
+
+redraw_enc2_widget =
+function()
+  redraw_param_widget(enc2_x, enc2_y, "FREQ", adaptive_freq_raw(params:get("filter_frequency")))
+end
+
+redraw_enc3_widget =
+function()
+  redraw_param_widget(enc3_x, enc3_y, "FREQ", tostring(util.round(params:get("filter_resonance")*100, 1)) .. "%")
+end
+  
+redraw_key2_widget =
+function()
+  screen.move(key2_x, key2_y)
+  
+  if fine then
+    screen.level(hi_level)
+    screen.text("FINE")
+  else
+    screen.level(lo_level)
+    screen.text("COARSE")
+  end
+end
+
+redraw_key3_widget =
+function()
+  screen.move(key3_x, key3_y)
+  
+  if engine_ready then
+    if trigging then
+      screen.level(hi_level)
+    else
+      screen.level(lo_level)
+    end
+    screen.text("TRIG")
+  end
 end
 
 enc =
