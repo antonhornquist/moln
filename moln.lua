@@ -1,5 +1,5 @@
 -- scriptname: moln
--- v1.2.1 @jah
+-- v1.2.2 @jah
 
 local R = require 'r/lib/r'
 local r_engine = R.engine

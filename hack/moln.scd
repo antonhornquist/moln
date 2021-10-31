@@ -19,7 +19,7 @@ var script_name = PathName(thisProcess.nowExecutingPath).fileNameWithoutExtensio
 start_script.value(script_name) {
 
 // scriptname: moln
-// v1.3.0 @jah
+// v1.2.2 @jah
 
 var rrrr = include_relative.value(r_engine_root_relative +/+ "lib" +/+ "r.scd");
 var rrrr_lib = rrrr[\lib];
