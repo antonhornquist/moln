@@ -1,5 +1,5 @@
 (
-var percentage_raw = { |value|
+var percentage_raw = { |value|
 	round(value*100, 1).asString + "%"
 };
 
