@@ -76,6 +76,7 @@ var lastkeynote;
 var polyphony = 5;
 var note_downs = ();
 var note_slots = ();
+var voice_allocator;
 
 var 
 create_modules =
@@ -489,7 +490,7 @@ var
 note_on =
 { |note, velocity|
 	if (note_slots[note].isNil) {
-		var slot = ~voice_allocator.get__();
+		var slot = voice_allocator.get__();
 		var voicenum = slot[\id__]; // TODO: + 1 ---- 0 or 1 based?
 		trig_voice.value(voicenum, note);
 		slot[\on_release__] = {
@@ -506,7 +507,7 @@ note_off =
 { |note|
 	var slot = note_slots[note];
 	if (slot.notNil) {
-		~voice_allocator.release__(slot);
+		voice_allocator.release__(slot);
 		note_downs[slot[\id]] = nil;
 	};
 };
@@ -701,6 +702,74 @@ init_ui =
 	init_engine_init_delay_metro.value();
 };
 
+var
+redraw_enc1_widget =
+{
+	~screen.move_(enc1_x, enc1_y);
+	~screen.level_(lo_level);
+	~screen.text_("LEVEL");
+	~screen.move_(enc1_x+45, enc1_y);
+	~screen.level_(hi_level);
+	~screen.text_(round(~params.get_raw_("main_level")*100).asInteger.asString);
+};
+
+var
+redraw_event_flash_widget =
+{
+	~screen.level_(lo_level);
+	~screen.rect_(122, enc1_y-7, 5, 5);
+	~screen.fill_();
+};
+
+var
+redraw_param_widget =
+{ |x, y, label, value|
+	~screen.move_(x, y);
+	~screen.level_(lo_level);
+	~screen.text_(label);
+	~screen.move_(x, y+12);
+	~screen.level_(hi_level);
+	~screen.text_(value);
+};
+
+var
+redraw_enc2_widget =
+{
+	redraw_param_widget.value(enc2_x, enc2_y, "FREQ", adaptive_freq_raw.value(~params.get_("filter_frequency")));
+};
+
+var
+redraw_enc3_widget =
+{
+	redraw_param_widget.value(enc3_x, enc3_y, "RES", ~params.get_("filter_resonance").asString++"%");
+};
+
+var
+redraw_key2_widget =
+{
+	~screen.move_(key2_x, key2_y);
+	if (fine) {
+		~screen.level_(hi_level);
+		~screen.text_("FINE");
+	} {
+		~screen.level_(lo_level);
+		~screen.text_("COARSE");
+	};
+};
+
+var
+redraw_key3_widget = {
+	~screen.move_(key3_x, key3_y);
+	if (engine_ready) {
+		if (trigging) {
+			~screen.level_(hi_level);
+		} {
+			~screen.level_(lo_level);
+		};
+		~screen.text_("TRIG");
+	};
+};
+
 ~
 engine.name = 'R'
 ;
@@ -708,7 +777,7 @@ engine.name = 'R'
 ~
 init =
 {
-	~voice_allocator = voice_new.value(polyphony);
+	voice_allocator = voice_new.value(polyphony);
 
 	create_modules.value();
 	set_static_module_params.value();
@@ -746,74 +815,6 @@ redraw =
 	redraw_key3_widget.value();
 
 	~screen.update_();
-};
-
-~
-redraw_enc1_widget =
-{
-	~screen.move_(enc1_x, enc1_y);
-	~screen.level_(lo_level);
-	~screen.text_("LEVEL");
-	~screen.move_(enc1_x+45, enc1_y);
-	~screen.level_(hi_level);
-	~screen.text_(round(~params.get_raw_("main_level")*100).asInteger.asString);
-};
-
-~
-redraw_event_flash_widget =
-{
-	~screen.level_(lo_level);
-	~screen.rect_(122, enc1_y-7, 5, 5);
-	~screen.fill_();
-};
-
-~
-redraw_param_widget =
-{ |x, y, label, value|
-	~screen.move_(x, y);
-	~screen.level_(lo_level);
-	~screen.text_(label);
-	~screen.move_(x, y+12);
-	~screen.level_(hi_level);
-	~screen.text_(value);
-};
-
-~
-redraw_enc2_widget =
-{
-	redraw_param_widget.value(enc2_x, enc2_y, "FREQ", adaptive_freq_raw.value(~params.get_("filter_frequency")));
-};
-
-~
-redraw_enc3_widget =
-{
-	redraw_param_widget.value(enc3_x, enc3_y, "RES", ~params.get_("filter_resonance").asString++"%");
-};
-
-~
-redraw_key2_widget =
-{
-	~screen.move_(key2_x, key2_y);
-	if (fine) {
-		~screen.level_(hi_level);
-		~screen.text_("FINE");
-	} {
-		~screen.level_(lo_level);
-		~screen.text_("COARSE");
-	};
-};
-
-~
-redraw_key3_widget = {
-	~screen.move_(key3_x, key3_y);
-	if (engine_ready) {
-		if (trigging) {
-			~screen.level_(hi_level);
-		} {
-			~screen.level_(lo_level);
-		};
-		~screen.text_("TRIG");
-	};
 };
 
 ~

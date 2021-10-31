@@ -1,6 +1,6 @@
 (
 var percentage_raw = { |value|
-	round(value*100, 1).asString ++ "%"
+	round(value*100, 1).asString + "%"
 };
 
 var percentage = { |param|

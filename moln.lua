@@ -670,6 +670,77 @@ function()
   init_engine_init_delay_metro()
 end
 
+local
+redraw_enc1_widget =
+function()
+  screen.move(enc1_x, enc1_y)
+  screen.level(lo_level)
+  screen.text("LEVEL")
+  screen.move(enc1_x+45, enc1_y)
+  screen.level(hi_level)
+  screen.text(util.round(params:get_raw("main_level")*100, 1))
+end
+
+local
+redraw_event_flash_widget =
+function()
+  screen.level(lo_level)
+  screen.rect(122, enc1_y-7, 5, 5)
+  screen.fill()
+end
+
+local
+redraw_param_widget =
+function(x, y, label, value)
+  screen.move(x, y)
+  screen.level(lo_level)
+  screen.text(label)
+  screen.move(x, y+12)
+  screen.level(hi_level)
+  screen.text(value)
+end
+
+local
+redraw_enc2_widget =
+function()
+  redraw_param_widget(enc2_x, enc2_y, "FREQ", adaptive_freq_raw(params:get("filter_frequency")))
+end
+
+local
+redraw_enc3_widget =
+function()
+  redraw_param_widget(enc3_x, enc3_y, "FREQ", tostring(util.round(params:get("filter_resonance")*100, 1)) .. "%")
+end
+  
+local
+redraw_key2_widget =
+function()
+  screen.move(key2_x, key2_y)
+  
+  if fine then
+    screen.level(hi_level)
+    screen.text("FINE")
+  else
+    screen.level(lo_level)
+    screen.text("COARSE")
+  end
+end
+
+local
+redraw_key3_widget =
+function()
+  screen.move(key3_x, key3_y)
+  
+  if engine_ready then
+    if trigging then
+      screen.level(hi_level)
+    else
+      screen.level(lo_level)
+    end
+    screen.text("TRIG")
+  end
+end
+
 engine.name = 'R'
 
 init =
@@ -710,70 +781,6 @@ function()
   redraw_key3_widget()
 
   screen.update()
-end
-
-redraw_enc1_widget =
-function()
-  screen.move(enc1_x, enc1_y)
-  screen.level(lo_level)
-  screen.text("LEVEL")
-  screen.move(enc1_x+45, enc1_y)
-  screen.level(hi_level)
-  screen.text(util.round(params:get_raw("main_level")*100, 1))
-end
-
-redraw_event_flash_widget =
-function()
-  screen.level(lo_level)
-  screen.rect(122, enc1_y-7, 5, 5)
-  screen.fill()
-end
-
-redraw_param_widget =
-function(x, y, label, value)
-  screen.move(x, y)
-  screen.level(lo_level)
-  screen.text(label)
-  screen.move(x, y+12)
-  screen.level(hi_level)
-  screen.text(value)
-end
-
-redraw_enc2_widget =
-function()
-  redraw_param_widget(enc2_x, enc2_y, "FREQ", adaptive_freq_raw(params:get("filter_frequency")))
-end
-
-redraw_enc3_widget =
-function()
-  redraw_param_widget(enc3_x, enc3_y, "FREQ", tostring(util.round(params:get("filter_resonance")*100, 1)) .. "%")
-end
-  
-redraw_key2_widget =
-function()
-  screen.move(key2_x, key2_y)
-  
-  if fine then
-    screen.level(hi_level)
-    screen.text("FINE")
-  else
-    screen.level(lo_level)
-    screen.text("COARSE")
-  end
-end
-
-redraw_key3_widget =
-function()
-  screen.move(key3_x, key3_y)
-  
-  if engine_ready then
-    if trigging then
-      screen.level(hi_level)
-    else
-      screen.level(lo_level)
-    end
-    screen.text("TRIG")
-  end
 end
 
 enc =
