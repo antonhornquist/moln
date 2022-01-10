@@ -1,16 +1,46 @@
+// TODO: rename method_'s to method__'s
 (
 var include_relative = { |relative_path|
 	var path = (PathName(thisProcess.nowExecutingPath).pathOnly +/+ relative_path).standardizePath;
 	if (File.exists(path)) {
 		var result = this.executeFile(path);
-		if (result.isNil) { Error("error importing %".format(path)).throw; } { result }; // TODO: adopt in other places too
+		if (result.isNil) { Error("error importing %".format(path)).throw; } { result };
 	} {
 		Error("include_relative: file % does not exist".format(path.quote)).throw;
 	};
 };
 
-var r_engine_root = ".." +/+ ".." +/+ ".." +/+ "r";
-var ack_engine_root = ".." +/+ ".." +/+ ".." +/+ "ack";
+var include_absolute = { |absolute_path|
+	var path = absolute_path.standardizePath;
+	if (File.exists(path)) {
+		var result = this.executeFile(path);
+		if (result.isNil) { Error("error importing %".format(path)).throw; } { result };
+	} {
+		Error("include_absolute: file % does not exist".format(path.quote)).throw;
+	};
+};
+
+var include_engine_dependency = { |engine_name|
+	var engine_root = engine_paths[engine_name.asSymbol][\absolute_path];
+	if (File.exists(engine_root)) {
+		include_absolute.value(engine_root +/+ "lib" +/+ (engine_name.asString ++ ".scd"));
+	} {
+		Error("include_engine_dependency: FAILED. expected engine % installed at %".format(engine_name, engine_root.quote)).throw; // TODO: ugly path
+	};
+};
+
+var lookup_absolute_path = { |relative_path|
+	(PathName(thisProcess.nowExecutingPath).pathOnly +/+ relative_path).standardizePath;
+};
+
+var engine_paths = (
+	ack: (
+		relative_path: ".." +/+ ".." +/+ ".." +/+ "ack"
+	),
+	r: (
+		relative_path: ".." +/+ ".." +/+ ".." +/+ "r"
+	),
+).collect { |dict, engine_name| dict[\absolute_path] = lookup_absolute_path.value(dict[\relative_path])};
 
 var namespaces = ();
 
@@ -103,81 +133,90 @@ namespaces.arc_device_manager = {
 namespaces.midi_device_manager = {
 	var init_midi_device_manager = { |script_env|
 		var midi_device_manager = ();
+
+		var route_incoming_midi_message = { |midi_device, message|
+			script_env.use {
+				if (~device_to_enc_key_mapper.handle_midi_(message).isNil) {
+					midi_device[\event].value( // TODO: change to event_, if possible without introducing self arg
+						message
+					);
+				}
+			};
+		};
+
+		var midi_device;
+
+		midi_device = ();
+
+		midi_device.device_ = { |self|
+			if (MIDIClient.sources.notEmpty or: MIDIClient.destinations.notEmpty) {
+				MIDIClient
+			}
+		};
+
+		MIDIIn.connectAll;
+
+		midi_device_manager['__midi_funcs__'] = midi_device_manager['__midi_funcs__'].add(
+			MIDIFunc.cc(
+				{ |val, num, chan|
+					route_incoming_midi_message.value(
+						midi_device,
+						(
+							type: 'cc',
+							val: val,
+							num: num,
+							chan: chan
+						)
+					);
+				}
+			)
+		);
+
+		midi_device_manager['__midi_funcs__'] = midi_device_manager['__midi_funcs__'].add(
+			MIDIFunc.noteOn(
+				{ |vel, note, chan|
+					route_incoming_midi_message.value(
+						midi_device,
+						(
+							type: 'note_on',
+							vel: vel,
+							note: note,
+							chan: chan
+						)
+					);
+				}
+			)
+		);
+
+		midi_device_manager['__midi_funcs__'] = midi_device_manager['__midi_funcs__'].add(
+			MIDIFunc.noteOff(
+				{ |vel, note, chan|
+					route_incoming_midi_message.value(
+						midi_device,
+						(
+							type: 'note_off',
+							vel: vel,
+							note: note,
+							chan: chan
+						)
+					);
+				}
+			)
+		);
+
 		midi_device_manager.connect_ = { |self, n|
-			var midi_device;
-
-			MIDIIn.connectAll;
-
 			n = n ? 1;
 
 			if (n != 1) {
 				Error("multiple midi devices are not supported").throw
 			};
 
-			midi_device = ();
-
-			midi_device.device_ = { |self|
-				if (MIDIClient.sources.notEmpty or: MIDIClient.destinations.notEmpty) {
-					MIDIClient
-				}
-			};
 /*
 			TODO: midi_device out
 			midi_device.send_ = { |self, data|
 				MIDIOut....
 			};
 */
-
-			midi_device_manager['__midi_funcs__'] = midi_device_manager['__midi_funcs__'].add(
-				MIDIFunc.cc(
-					{ |val, num, chan|
-						script_env.use {
-							midi_device[\event].value( // TODO: change to event_, if possible without introducing self arg
-								(
-									type: 'cc',
-									val: val,
-									num: num,
-									chan: chan
-								)
-							);
-						};
-					}
-				)
-			);
-
-			midi_device_manager['__midi_funcs__'] = midi_device_manager['__midi_funcs__'].add(
-				MIDIFunc.noteOn(
-					{ |vel, note, chan|
-						script_env.use {
-							midi_device[\event].value(
-								(
-									type: 'note_on',
-									vel: vel,
-									note: note,
-									chan: chan
-								)
-							);
-						};
-					}
-				)
-			);
-
-			midi_device_manager['__midi_funcs__'] = midi_device_manager['__midi_funcs__'].add(
-				MIDIFunc.noteOff(
-					{ |vel, note, chan|
-						script_env.use {
-							midi_device[\event].value(
-								(
-									type: 'note_off',
-									vel: vel,
-									note: note,
-									chan: chan
-								)
-							);
-						};
-					}
-				)
-			);
 
 			midi_device;
 		};
@@ -324,29 +363,36 @@ namespaces.poll_manager = {
 				var new_poll;
 
 				new_poll = ();
-				new_poll.is_running_ = false;
+				new_poll[\is_running_] = false;
 				new_poll.time_ = engine_poll_time ? 0.25;
 				new_poll.action_ = callback;
 
 				new_poll.start_ = { |self|
-					if (self.is_running_.not) {
+					if (self[\is_running_].not) {
 						self.task_ = Task {
 							inf.do {
 								self[\action_].value(engine_poll_func.value); // TODO: wrap in Environment.use
 								self.time_.wait;
 							}
 						}.play;
+						self[\is_running_] = true;
 						// "poll started".inform;
 					} {
 						"poll already started".inform;
 					};
 				};
 				new_poll.stop_ = { |self|
-					if (self.is_running_) {
+					if (self[\is_running_]) {
 						self.task_.stop;
+						self[\is_running_] = false;
+						// "poll stopped".inform;
 					} {
 						"poll already stopped".inform;
 					};
+				};
+				new_poll.free_ = { |self|
+					self.stop_();
+					self['__polls__'].remove(self);
 				};
 				new_poll.update_ = { |self|
 					{
@@ -362,11 +408,18 @@ namespaces.poll_manager = {
 			};
 		};
 
+		poll_manager.free_all_ = { |self|
+			self['__polls__'].copy.do { |poll|
+				poll.free_();
+			};
+		};
+
 		poll_manager;
 	};
 
 	var free_poll_manager = { |poll_manager|
-		// TODO: stop tasks, etc
+		// TODO poll_manager['__polls__'].do { |poll| poll.free_() };
+		poll_manager.free_all_();
 	};
 
 	var module = IdentityDictionary[
@@ -432,7 +485,7 @@ namespaces.metro_manager = {
 	};
 
 	var free_metro_manager = { |metro_manager|
-		// TODO: stop metros, etc -- free all will do?
+		metro_manager.free_all_();
 	};
 
 	var module = IdentityDictionary[
@@ -752,7 +805,8 @@ namespaces.paramset = {
 	var init_paramset = { |script_env|
 		var paramset = (
 			name: "unnamed",
-			params: []
+			params: [],
+			count: 0
 		);
 
 		paramset.add_separator_ = { |self|
@@ -785,7 +839,7 @@ namespaces.paramset = {
 				param.get_ = { |self|
 					self[\path];
 				};
-				param.set__ = { |self, value, silent|
+				param.set__ = { |self, value, silent| // TODO: set__
 					value = value.asString;
 					if (self[\path] != value) {
 						self[\path] = value;
@@ -908,6 +962,7 @@ namespaces.paramset = {
 			};
 
 			self[\params] = self[\params].add(param);
+			self[\count] = self[\count] + 1;
 		};
 		paramset.lookup_param_ = { |self, id|
 			self[\params].detect { |param| param[\id] == id.asSymbol };
@@ -916,7 +971,7 @@ namespaces.paramset = {
 			var param = self.lookup_param_(id);
 			param[\name];
 		};
-		paramset.set__ = { |self, id, value|
+		paramset.set__ = { |self, id, value| // TODO: set__
 			var param = self.lookup_param_(id);
 			param.set__(value);
 		};
@@ -1039,9 +1094,8 @@ namespaces.paramset = {
 	module;
 }.value;
 
-// TODO: load on demand
-namespaces.ack_engine = {
-	var ack = include_relative.value(ack_engine_root +/+ "lib" +/+ "ack.scd");
+namespaces.ack_engine_loader = {
+	var ack = include_engine_dependency.value(\ack);
 
 	var init = ack[\init];
 	var free = ack[\free];
@@ -1082,7 +1136,6 @@ namespaces.ack_engine = {
 
 	// server booted assumed
 	var load_engine = {
-		var tmp;
 		var ack_instance = init.value(
 			(
 				autostartServer: false,
@@ -1210,11 +1263,10 @@ namespaces.ack_engine = {
 	];
 
 	module
-}.value;
+};
 
-// TODO: load on demand
-namespaces.r_engine = {
-	var rrrr = include_relative.value(r_engine_root +/+ "lib" +/+ "r.scd");
+namespaces.r_engine_loader = {
+	var rrrr = include_engine_dependency.value(\r);
 
 	var init = rrrr[\init];
 	var free = rrrr[\free];
@@ -1315,7 +1367,7 @@ namespaces.r_engine = {
 				\delete -> { |self, moduleRef|
 					deleteCommand.value(r_instance, moduleRef);
 				},
-				\set -> { |self, moduleParameterRef, value|
+				\set -> { |self, moduleParameterRef, value| // TODO: compare with paramset - this turns into "set_" whereas paramset has "set__"
 					setCommand.value(r_instance, moduleParameterRef, value);
 				},
 				\bulkset -> { |self, bundle|
@@ -1371,24 +1423,353 @@ namespaces.r_engine = {
 	];
 
 	module
+};
+
+namespaces.param_ui_manager = {
+
+	var screen_width = 128;
+	var screen_height = 64;
+	var screen_x_spec = ControlSpec(1, screen_width, 'linear', 1, 0, "");
+	var screen_y_spec = ControlSpec(1, screen_height, 'linear', 1, 0, "");
+	var screen_l_spec = ControlSpec(0, 15, 'linear', 1, 0, "");
+
+	var hi_level = screen_l_spec.maxval;
+	var lo_level = round(screen_l_spec.maxval/4);
+	var mid_level = round((hi_level+lo_level)/2); // TODO
+
+	var redraw_row_label = { |label, y_pos, level|
+		~screen.level_(level);
+		~screen.move_(1, y_pos);
+		~screen.text_(label.asString);
+	};
+
+	var redraw_row_value = { |value, y_pos, level|
+		~screen.level_(level);
+		~screen.move_(128, y_pos);
+		~screen.text_right_(value.asString);
+	};
+
+	var redraw_param = { |param, y_pos, level|
+		case
+		{ param[\type] == 'separator' } {
+			redraw_row_label.value(Array.fill(35) { "_" }.join, y_pos, level);
+		}
+		{ ['file', 'control', 'option', 'number'].includes(param[\type]) } {
+			redraw_row_label.value(param[\name], y_pos, level);
+			redraw_row_value.value(param.string_(), y_pos, level);
+		};
+	};
+
+	var init_param_ui_manager = { |script_env|
+		var row_height = 10;
+		var params_per_page = 6;
+
+		var param_ui = (
+			cursor: 0
+		);
+
+		param_ui.redraw_ = { |self|
+			var cursor = self[\cursor];
+
+			~screen.clear_();
+			~screen.font_size_(8);
+
+			((-2) max: (((cursor-2) min: (~params[\count]-params_per_page)))..((cursor+3) min: (~params[\count]))).do { |param_index, index|
+				case
+				{param_index == -2} {
+					redraw_row_label.value("PARAMETERS", 1 + row_height, lo_level);
+				}
+				{param_index == -1} {
+				}
+				{true} {
+					if (param_index < ~params[\count]) {
+						var param = ~params[\params][param_index];
+						var level;
+						if ((param_ui[\active] == 'param_ui_row') and: ((index+1) == param_ui[\param_ui_row])) {
+							level = hi_level;
+						} {
+							if ((param_ui[\focus] == 'param_ui_row') and: ((index+1) == param_ui[\param_ui_row])) {
+								level = mid_level;
+							} {
+								if (param_index == cursor) {
+									level = hi_level;
+								} {
+									level = lo_level;
+								};
+							};
+						};
+						redraw_param.value(param, 1 + ((index+1) * row_height), level);
+					};
+				}
+			};
+
+			~screen.update_();
+		};
+
+		param_ui.key_ = { |self, n, z|
+			~redraw.value();
+		};
+
+		param_ui.enc_ = { |self, n, delta|
+			case
+			{n == 2} {
+				param_ui.cursor_delta_(delta);
+			}
+			{n == 3} {
+				param_ui.selected_param_delta_(delta);
+			}
+			;
+			~redraw.value();
+		};
+
+		param_ui.kbdkey_ = { |self, keycode, z|
+			case
+			{(keycode == 40) and: (z == 1)} {
+				param_ui.cursor_delta_(1);
+			}
+			{(keycode == 38) and: (z == 1)} {
+				param_ui.cursor_delta_(-1);
+			}
+			{(keycode == 37) and: (z == 1)} {
+				param_ui.selected_param_delta_(-1);
+			}
+			{(keycode == 39) and: (z == 1)} {
+				param_ui.selected_param_delta_(1);
+			}
+			;
+			~redraw.value();
+		};
+
+		param_ui.mouse_ = { |self, what, args|
+			case
+			{ what == "leave" } {
+				self.mouse_leave_();
+			}
+			{ what == "over" } {
+				var x_pos = args[0], y_pos = args[1];
+				self.mouse_over_(x_pos, y_pos);
+			}
+			{ what == "down" } {
+				var x_pos = args[0], y_pos = args[1];
+				self.mouse_down_(x_pos, y_pos);
+			}
+			{ what == "move" } {
+				var x_pos = args[0], y_pos = args[1];
+				self.mouse_move_(x_pos, y_pos);
+			}
+			{ what == "up" } {
+				var x_pos = args[0], y_pos = args[1];
+				self.mouse_up_(x_pos, y_pos);
+			}
+			{ what == "wheel" } {
+				var x_delta = args[0], y_delta = args[1];
+				self.mouse_wheel_(x_delta, y_delta);
+			};
+			~redraw.value();
+		};
+
+		param_ui.cursor_delta_ =
+		{ |self, delta|
+			self[\cursor] = (self[\cursor] + delta) min: (~params[\count]-1) max: 0;
+		};
+
+		param_ui.selected_param_delta_ =
+		{ |self, delta|
+			var param = ~params[\params][self[\cursor]];
+			param.delta_(delta);
+		};
+
+		param_ui.within_param_value_bounds_ =
+		{ |self, pos|
+			self.get_row_at_(pos).notNil;
+		};
+
+		param_ui.get_row_at_ =
+		{ |self, pos|
+			round(pos.y / row_height);
+		};
+
+		param_ui.update_focus_ =
+		{ |self, pos|
+			case
+			{ self.within_param_value_bounds_(pos) } {
+				self.focus = 'param_ui_row';
+				self.param_ui_row = self.get_row_at_(pos);
+			}
+			{ true } {
+				self.focus = nil;
+				self.param_ui_row = nil;
+			};
+		};
+
+		param_ui.mouse_over_ =
+		{ |self, x_pos, y_pos|
+			self.mouse_over_pos = x_pos@y_pos;
+			self.update_focus_(self.mouse_over_pos); // TODO: only if mouse is not pressed(?)
+		};
+
+		param_ui.mouse_down_ =
+		{ |self, x_pos, y_pos|
+			self.mouse_down_pos = x_pos@y_pos;
+
+			case
+			{ self.focus == 'param_ui_row' } {
+			}
+			;
+
+			self.active = self.focus;
+		};
+
+		param_ui.mouse_move_ =
+		{ |self, x_pos, y_pos|
+			var mouse_move_delta;
+
+			var cursor = self[\cursor];
+			var prev_mouse_move_pos = self.mouse_move_pos;
+
+			self.mouse_move_pos = x_pos@y_pos;
+			mouse_move_delta = (prev_mouse_move_pos ? self.mouse_down_pos) - (x_pos@y_pos);
+
+			case
+			{ self.active == 'param_ui_row' } {
+				if (mouse_move_delta.y != 0) {
+					{ |cursor, param_ui_row, delta|
+						var param_index = ((-2) max: (((cursor-2) min: (~params[\count]-params_per_page)))..((cursor+3) min: (~params[\count])))[param_ui_row];
+						var param_in_focus = ~params[\params][param_index];
+
+						var fine = false; // TODO
+						var divisor;
+
+						if (param_in_focus.notNil) {
+							if (fine) {
+								divisor = 5;
+							} {
+								divisor = 1;
+							};
+							param_in_focus.delta_(delta/divisor);
+						};
+					}.value(self[\cursor], self[\param_ui_row]-1, mouse_move_delta.y);
+				};
+			}
+			;
+		};
+
+		param_ui.mouse_wheel_ =
+		{ |self, x_delta, y_delta|
+			if (y_delta != 0) {
+				case
+				{self.focus == 'param_ui_row'} {
+					{ |cursor, param_ui_row, delta|
+						var param_index = ((-2) max: (((cursor-2) min: (~params[\count]-params_per_page)))..((cursor+3) min: (~params[\count])))[param_ui_row];
+						var param_in_focus = ~params[\params][param_index];
+
+						var fine = false; // TODO
+						var divisor;
+
+						if (param_in_focus.notNil) {
+							if (fine) {
+								divisor = 5;
+							} {
+								divisor = 1;
+							};
+							param_in_focus.delta_(delta/divisor);
+						};
+					}.value(self[\cursor], self[\param_ui_row]-1, y_delta);
+				};
+			};
+		};
+
+		param_ui.mouse_up_ =
+		{ |self, x_pos, y_pos|
+			self.mouse_move_pos = nil;
+			self.active = nil;
+			self.update_focus_(x_pos@y_pos);
+		};
+
+		param_ui.mouse_leave_ =
+		{ |self|
+			self.focus = nil;
+		};
+
+		param_ui;
+	};
+
+	// TODO: implement free_param_ui_manager
+
+	var module = IdentityDictionary[
+		\init_param_ui_manager -> init_param_ui_manager
+	];
+
+	module;
+}.value;
+
+namespaces.device_to_enc_key_mapper = {
+
+	var init_device_to_enc_key_mapper = { |script_env|
+		var mapper = ();
+		mapper.handle_midi_ = { |self, message|
+			if ((message[\chan] == 0) and: (message[\type] == \cc)) {
+				var val = message[\val];
+				var num = message[\num];
+				case
+				{ (num == 1) and: ([1, 127].includes(val)) } {
+					script_env.use {
+						~enc.value(2, if (val == 127, -1, 1));
+					}
+				}
+				{ (num == 2) and: ([1, 127].includes(val)) } {
+					script_env.use {
+						~enc.value(3, if (val == 127, -1, 1));
+					}
+				}
+				{ (num == 4) and: ([1, 127].includes(val)) } {
+					script_env.use {
+						~enc.value(1, if (val == 127, -1, 1));
+					}
+				}
+				{ (num == 50) and: ([0, 127].includes(val)) } {
+					script_env.use {
+						~key.value(2, if (val == 127, 1, 0));
+					}
+				}
+				{ (num == 51) and: ([0, 127].includes(val)) } {
+					script_env.use {
+						~key.value(3, if (val == 127, 1, 0));
+					}
+				}
+				{ (num == 48) and: ([0, 127].includes(val)) } {
+					if (val == 127) {
+						script_env.use {
+							if (~norns[\showing_param_ui].asBoolean) {
+								~switch_to_script.value();
+								~norns[\showing_param_ui] = false;
+							} {
+								~switch_to_params_ui.value();
+								~norns[\showing_param_ui] = true;
+							};
+						};
+					};
+				}
+				;
+			} {
+				nil
+			};
+		};
+	};
+
+	// TODO: implement free_device_to_enc_key_mapper
+
+	var module = IdentityDictionary[
+		\init_device_to_enc_key_mapper -> init_device_to_enc_key_mapper
+	];
+
+	module;
 }.value;
 
 if (~include_nel_libraries.asBoolean) { // TODO: ugly hack, get around using globals here
 	namespaces;
 } {
 	{
-		var screen = namespaces[\screen];
-		var init_screen = screen[\init_screen];
-
-		var metro_manager = namespaces[\metro_manager];
-		var init_metro_manager = metro_manager[\init_metro_manager];
-
-		var poll_manager = namespaces[\poll_manager];
-		var init_poll_manager = poll_manager[\init_poll_manager];
-
-		var paramset = namespaces[\paramset];
-		var init_paramset = paramset[\init_paramset];
-
 		var arc_device_manager = namespaces[\arc_device_manager];
 		var init_arc_device_manager = arc_device_manager[\init_arc_device_manager];
 		var free_arc_device_manager = arc_device_manager[\free_arc_device_manager];
@@ -1400,6 +1781,27 @@ if (~include_nel_libraries.asBoolean) { // TODO: ugly hack, get around using glo
 		var grid_device_manager = namespaces[\grid_device_manager];
 		var init_grid_device_manager = grid_device_manager[\init_grid_device_manager];
 		var free_grid_device_manager = grid_device_manager[\free_grid_device_manager];
+
+		var poll_manager = namespaces[\poll_manager];
+		var init_poll_manager = poll_manager[\init_poll_manager];
+		var free_poll_manager = poll_manager[\free_poll_manager];
+
+		var metro_manager = namespaces[\metro_manager];
+		var init_metro_manager = metro_manager[\init_metro_manager];
+
+		var screen = namespaces[\screen];
+		var init_screen = screen[\init_screen];
+
+		var paramset = namespaces[\paramset];
+		var init_paramset = paramset[\init_paramset];
+
+		var param_ui_manager = namespaces[\param_ui_manager];
+		var init_param_ui_manager = param_ui_manager[\init_param_ui_manager];
+		var free_param_ui_manager = param_ui_manager[\free_param_ui_manager]; // TODO
+
+		var device_to_enc_key_mapper = namespaces[\device_to_enc_key_mapper];
+		var init_device_to_enc_key_mapper = device_to_enc_key_mapper[\init_device_to_enc_key_mapper];
+		var free_device_to_enc_key_mapper = device_to_enc_key_mapper[\free_device_to_enc_key_mapper]; // TODO
 
 		var scale = 6;
 		var screen_width = 128 * scale;
@@ -1461,17 +1863,32 @@ if (~include_nel_libraries.asBoolean) { // TODO: ugly hack, get around using glo
 							case
 								{ key_state[0].not and: shift_pressed }
 								{
+									script_env.use {
+										if (~norns[\showing_param_ui].asBoolean) {
+											switch_to_script.value();
+											~norns[\showing_param_ui] = false;
+										} {
+											~switch_to_params_ui.value();
+											~norns[\showing_param_ui] = true;
+										};
+									};
+/*
+	TODO
 									key_state[0] = true;
 									script_env.use {
 										~key.value(1, 1);
 									};
+*/
 								}
 								{ key_state[0] and: shift_pressed.not }
 								{
+/*
+	TODO
 									key_state[0] = false;
 									script_env.use {
 										~key.value(1, 0);
 									};
+*/
 								}
 							;
 
@@ -1511,10 +1928,58 @@ if (~include_nel_libraries.asBoolean) { // TODO: ugly hack, get around using glo
 						})
 						.keyDownAction_({ |view, char, modifiers, unicode, keycode, key|
 							var ctrl_pressed = modifiers & 262144 == 262144;
-							if (ctrl_pressed and: (keycode == 32)) {
+							if (ctrl_pressed and: (keycode == 32) or: (keycode == 27)) {
 								CmdPeriod.run;
+							} {
+								// TODO [char, modifiers, unicode, keycode, key].debug(\down);
+								script_env.use {
+									~kbdkey.value(keycode, 1);
+								};
 							};
-						});
+						})
+						.keyUpAction_({ |view, char, modifiers, unicode, keycode, key|
+							script_env.use {
+								~kbdkey.value(keycode, 0);
+							};
+						})
+						;
+				};
+
+				var switch_to_script = {
+					var saved_script_hooks = ~norns[\saved_script_hooks];
+					~redraw = saved_script_hooks[\redraw];
+					~enc = saved_script_hooks[\enc];
+					~key = saved_script_hooks[\key];
+					~mouse = saved_script_hooks[\mouse];
+					~kbdkey = saved_script_hooks[\kbdkey];
+					~norns[\saved_script_hooks] = nil;
+					~redraw.value();
+				};
+
+				var switch_to_params_ui = {
+					~norns[\saved_script_hooks] = (
+						redraw: ~redraw,
+						enc: ~enc,
+						key: ~key,
+						mouse: ~mouse,
+						kbdkey: ~kbdkey,
+					);
+					~redraw = {
+						~param_ui.redraw_();
+					};
+					~enc = { |index, delta|
+						~param_ui.enc_(index, delta);
+					};
+					~key = { |index, state|
+						~param_ui.key_(index, state);
+					};
+					~mouse = { |what ... args|
+						~param_ui.mouse_(what, args);
+					};
+					~kbdkey = { |keycode, state|
+						~param_ui.kbdkey_(keycode, state);
+					};
+					~redraw.value();
 				};
 
 				var mouse_pressed_pos;
@@ -1523,7 +1988,7 @@ if (~include_nel_libraries.asBoolean) { // TODO: ugly hack, get around using glo
 				var mouse_move_pos;
 
 				var scale_mouse_pos = { |x, y|
-					(round(x/scale)+1 /*max: 1*/)@(round(y/scale)+1 /*max: 1*/)
+					(round(x/scale)+1 /* TODO max: 1*/)@(round(y/scale)+1 /* TODO max: 1*/)
 				};
 
 				var mouse_enter_action = { |view|
@@ -1595,6 +2060,19 @@ if (~include_nel_libraries.asBoolean) { // TODO: ugly hack, get around using glo
 					pr_stop_script.value(script_instance);
 				};
 
+				var load_engine_library_lazily = { |engine_name|
+					var engine_namespace_sym = (engine_name.asString ++ "_engine").asSymbol;
+					var engine_namespace_string = engine_namespace_sym.asString;
+					if (namespaces[engine_namespace_sym].notNil) {
+						"in load_engine_library_lazily: using cached % engine library".format(engine_name.asString).inform;
+						namespaces[engine_namespace_sym]
+					} {
+						"in load_engine_library_lazily: loading % engine library anew".format(engine_name.asString).inform;
+						namespaces[engine_namespace_sym] = namespaces[(engine_namespace_string ++ "_loader").asSymbol].value;
+						namespaces[engine_namespace_sym];
+					};
+				};
+
 				script_env = Environment.make {
 					~norns = (
 						state: (
@@ -1610,6 +2088,11 @@ if (~include_nel_libraries.asBoolean) { // TODO: ugly hack, get around using glo
 					~midi = init_midi_device_manager.value(currentEnvironment);
 					~arc = init_arc_device_manager.value(currentEnvironment);
 					~grid = init_grid_device_manager.value(currentEnvironment);
+					~param_ui = init_param_ui_manager.value(currentEnvironment);
+					~device_to_enc_key_mapper = init_device_to_enc_key_mapper.value(currentEnvironment);
+
+					~switch_to_script = switch_to_script;
+					~switch_to_params_ui = switch_to_params_ui;
 
 					defer {
 						setup_window_mouse_and_key_hooks.value;
@@ -1628,11 +2111,11 @@ if (~include_nel_libraries.asBoolean) { // TODO: ugly hack, get around using glo
 	
 						case
 						{~engine[\name] == 'R' } {
-							s.waitForBoot {
-								var r_engine = namespaces[\r_engine];
-								var load_engine = r_engine[\load_engine];
-								var free_engine = r_engine[\free_engine];
+							var r_engine = load_engine_library_lazily.value(\r);
+							var load_engine = r_engine[\load_engine];
+							var free_engine = r_engine[\free_engine];
 
+							s.waitForBoot {
 								var r_engine_instance = load_engine.value;
 								var engine, polls;
 								# engine, poll_manager = setup_engine_globals.value(r_engine_instance[\commands], r_engine_instance[\polls]);
@@ -1641,16 +2124,16 @@ if (~include_nel_libraries.asBoolean) { // TODO: ugly hack, get around using glo
 								script_instance[\engine_free_func] = {
 									free_engine.value(r_engine_instance);
 								};
-								"R engine loaded".debug;
+								"R engine loaded".inform;
 								completeFunc.value;
 							};
 						}
 						{~engine[\name] == 'Ack' } {
-							s.waitForBoot {
-								var ack_engine = namespaces[\ack_engine];
-								var load_engine = ack_engine[\load_engine];
-								var free_engine = ack_engine[\free_engine];
+							var ack_engine = load_engine_library_lazily.value(\ack);
+							var load_engine = ack_engine[\load_engine];
+							var free_engine = ack_engine[\free_engine];
 
+							s.waitForBoot {
 								var ack_engine_instance = load_engine.value;
 								var engine, polls;
 								# engine, poll_manager = setup_engine_globals.value(ack_engine_instance[\commands], ack_engine_instance[\polls]);
@@ -1659,12 +2142,12 @@ if (~include_nel_libraries.asBoolean) { // TODO: ugly hack, get around using glo
 								script_instance[\engine_free_func] = {
 									free_engine.value(ack_engine_instance);
 								};
-								"Ack engine loaded".debug;
+								"Ack engine loaded".inform;
 								completeFunc.value;
 							};
 						}
 						{ true } {
-							"not supported engine".debug;
+							"not supported engine".error;
 							completeFunc.value;
 						};
 					}.value;
@@ -1677,7 +2160,7 @@ if (~include_nel_libraries.asBoolean) { // TODO: ugly hack, get around using glo
 
 				CmdPeriod.doOnce(teardown_function);
 
-				{ // defer since Qt requires properties to be set in AppClock
+				{ // deferred since Qt requires properties to be set in AppClock
 					screen_view
 						.mouseEnterAction_(mouse_enter_action)
 						.mouseOverAction_(mouse_over_action)
@@ -1714,9 +2197,10 @@ if (~include_nel_libraries.asBoolean) { // TODO: ugly hack, get around using glo
 		};
 
 		var free_script = { |script_env|
-			free_midi_device_manager.value(script_env);
-			free_arc_device_manager.value(script_env);
-			free_grid_device_manager.value(script_env);
+			free_poll_manager.value(script_env[\poll]);
+			free_midi_device_manager.value(script_env[\midi]);
+			free_arc_device_manager.value(script_env[\arc]);
+			free_grid_device_manager.value(script_env[\grid]);
 		};
 
 		var select_script_environment = { |script_index|
@@ -1761,6 +2245,7 @@ if (~include_nel_libraries.asBoolean) { // TODO: ugly hack, get around using glo
 			fork { // TODO: what was this about? polls still trying to getSynchronous ?
 				0.2.wait;
 				engine_free_func.value;
+				~scripts.remove(script_env); // TODO: this removes from the currentEnvironment - do this in topEnvironment instead?
 			};
 			"removing CmdPeriod teardown function...".inform;
 			CmdPeriod.remove(teardown_function);
