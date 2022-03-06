@@ -542,6 +542,7 @@ init_midi =
 
 			}
 /*
+	TODO
 			{msg['type'] == 'cc'} {
 				var num = msg['num'];
 				var val = msg['val'];
