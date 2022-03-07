@@ -678,6 +678,7 @@ var
 init_ui =
 {
 	init_arc.value();
+	init_midi.value();
 	calculate_ui_bounds.value();
 	init_ui_refresh_metro.value();
 };
@@ -1128,7 +1129,7 @@ add_params =
 
 // section: polls
 
-// TODO
+// TODO: no polls here
 
 // section: settings
 
@@ -1579,16 +1580,18 @@ mouse_leave =
 
 // section: voice allocation
 
-var voice = include_relative.value("lib" +/+ "voice.scd");
+var voice = include_relative.value("lib" +/+ "voice.scd"); // TODO: MOVE UP ??
 var voice_new = voice[\voice_new];
 
-var polyphony = 5;
+var voice_allocator; // TODO: MOVE UP
+
+var polyphony = 5; // TODO: MOVE UP
 var note_downs = ();
 var note_slots = ();
 
 var note_on = { |note, velocity|
 	if (note_slots[note].isNil) {
-		var slot = ~voice_allocator.get__();
+		var slot = voice_allocator.get__();
 		var voicenum = slot[\id__]; // TODO: + 1
 		trig_voice.value(voicenum, note);
 		slot[\on_release__] = {
@@ -1611,7 +1614,7 @@ var release_voice = { |voicenum|
 var note_off = { |note|
 	var slot = note_slots[note];
 	if (slot.notNil) {
-		~voice_allocator.release__(slot);
+		voice_allocator.release__(slot);
 		note_downs[slot[\id]] = nil;
 	};
 };
@@ -1627,6 +1630,7 @@ init =
 {
 	var visual_buf_size = (round(ui_refresh_rate*visual_trail_duration) max: 1);
 	visual_values_dict = (); // create_visual_values_bufs.value(visual_buf_size); TODO: no polls
+	voice_allocator = voice_new.value(polyphony);
 	init_r_modules.value();
 	add_params.value(get_param_specs.value());
 	load_settings.value();
